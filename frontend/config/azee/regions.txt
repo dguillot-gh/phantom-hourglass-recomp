@@ -1,0 +1,5 @@
+# Code regions: code carried inside an overlay and copied to another address at run time.
+# Facts only: <name> <carrying module> <source address> <size> <run address> [interpret].
+# `interpret`: hand-written code that does not follow the call/return conventions the recompiler relies on;
+# the runtime runs it on the interpreter while it is resident.
+# None known for AZEE yet. Code with no recompiled function still runs, on the interpreter fallback.

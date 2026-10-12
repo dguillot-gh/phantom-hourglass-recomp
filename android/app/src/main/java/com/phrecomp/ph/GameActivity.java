@@ -1,0 +1,151 @@
+package com.phrecomp.ph;
+
+import android.app.AlertDialog;
+import android.content.SharedPreferences;
+import android.content.pm.ActivityInfo;
+import android.os.Build;
+import android.os.Bundle;
+import android.view.InputDevice;
+import android.view.KeyEvent;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowManager;
+
+import org.libsdl.app.SDLActivity;
+
+import java.io.File;
+
+/**
+ * The game: SDL runs the program (libmain.so, frontend/src/main.cpp) and the DS controls (DsPad) sit on top.
+ * It runs in its own process (":game" in the manifest): SDL's native side starts once per process, so quitting ends
+ * the process and the next Play starts a fresh one.
+ */
+public class GameActivity extends SDLActivity {
+    private DsPad pad;
+    private PhMenu menu;
+
+    @Override
+    protected String[] getLibraries() {
+        // SDL3 is linked into libmain.so (no separate libSDL3.so); the game itself, libph_game.so, is loaded by main.
+        return new String[] {"main"};
+    }
+
+    @Override
+    protected String[] getArguments() {
+        final File files = getFilesDir();
+        final SharedPreferences prefs = getSharedPreferences(DsPad.PREFS, MODE_PRIVATE);
+        return new String[] {
+                new File(files, "rom/azee.nds").getAbsolutePath(),
+                "--data-dir", files.getAbsolutePath(),
+                "--renderer", prefs.getBoolean("gpu", false) ? "gpu" : "software",
+                "--scale", String.valueOf(Math.min(6, prefs.getInt("scale", 2))),
+        };
+    }
+
+    /** Portrait: the phone held upright with both screens stacked (the Rotate button and the menu's switch). */
+    boolean portrait() { return getSharedPreferences(DsPad.PREFS, MODE_PRIVATE).getBoolean("portrait", false); }
+
+    void setPortrait(boolean on) {
+        getSharedPreferences(DsPad.PREFS, MODE_PRIVATE).edit().putBoolean("portrait", on).apply();
+        applyOrientation();
+        if (pad != null) pad.setScreen(on ? PhInput.SCREEN_BOTH : PhInput.SCREEN_TOUCH);
+    }
+
+    private void applyOrientation() {
+        setRequestedOrientation(portrait() ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+                                           : ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+    }
+
+    /** SDL sets the orientation from the window it makes (landscape): ours is the player's choice instead. */
+    @Override
+    public void setOrientationBis(int w, int h, boolean resizable, String hint) {
+        runOnUiThread(this::applyOrientation);
+    }
+
+    @Override
+    protected void onCreate(Bundle state) {
+        setRequestedOrientation(portrait() ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+                                           : ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        if (Build.VERSION.SDK_INT >= 28) {
+            getWindow().getAttributes().layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+        }
+        super.onCreate(state);
+        if (mLayout == null) return;  // SDL could not start (it is finishing)
+        if (!new File(getFilesDir(), "rom/azee.nds").isFile()) {  // reached without a ROM: back to the launcher
+            finish();
+            return;
+        }
+        pad = new DsPad(this);
+        mLayout.addView(pad, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        final SharedPreferences prefs = getSharedPreferences(DsPad.PREFS, MODE_PRIVATE);
+        menu = new PhMenu(this, pad, prefs);
+        pad.setMenu(menu);
+        // The display choices kept from last time.
+        PhInput.nativeSetSmooth(prefs.getBoolean("smooth", false));
+        PhInput.nativeSetFps(prefs.getBoolean("fps", false));
+        PhInput.nativeSetFpsCorner(prefs.getInt("fps_corner", 1));
+        PhInput.nativeSetStretch(prefs.getBoolean("stretch", false));
+        if (portrait()) pad.setScreen(PhInput.SCREEN_BOTH);
+        hideSystemBars();
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean focused) {
+        super.onWindowFocusChanged(focused);
+        if (focused) hideSystemBars();
+        else if (pad != null) pad.releaseAll();
+    }
+
+    @SuppressWarnings("deprecation")
+    private void hideSystemBars() {
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY |
+                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+    }
+
+    /* A gamepad or keyboard drives the game through SDL; the touch controls step aside until the screen is touched. */
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (pad != null && event.getKeyCode() != KeyEvent.KEYCODE_BACK && fromController(event)) pad.hideForController();
+        return super.dispatchKeyEvent(event);
+    }
+
+    @Override
+    public boolean dispatchGenericMotionEvent(MotionEvent event) {
+        if (pad != null && event.isFromSource(InputDevice.SOURCE_JOYSTICK)) pad.hideForController();
+        return super.dispatchGenericMotionEvent(event);
+    }
+
+    private static boolean fromController(KeyEvent event) {
+        if (event.isFromSource(InputDevice.SOURCE_GAMEPAD) || event.isFromSource(InputDevice.SOURCE_JOYSTICK)) return true;
+        final InputDevice device = event.getDevice();
+        return device != null && !device.isVirtual() && device.getKeyboardType() == InputDevice.KEYBOARD_TYPE_ALPHABETIC;
+    }
+
+    /** Back asks first: a stray swipe must not end the game. The save is on disk already (the game writes it). */
+    @Override
+    public void onBackPressed() {
+        if (menu != null && menu.isOpen()) {  // Back closes the menu first
+            menu.close();
+            return;
+        }
+        if (pad != null) pad.releaseAll();
+        new AlertDialog.Builder(this)
+                .setTitle("Quit Phantom Hourglass?")
+                .setMessage("Progress since your last save in the game is lost.")
+                .setPositiveButton("Quit", (d, w) -> finish())
+                .setNegativeButton("Keep playing", null)
+                .show();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (isFinishing()) System.exit(0);  // a fresh process for the next game
+    }
+}

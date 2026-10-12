@@ -1,0 +1,7 @@
+# Built or copied by 5-BUILD-ANDROID.ps1
+local.properties
+.gradle/
+build/
+app/build/
+app/.cxx/
+app/src/main/java/org/libsdl/

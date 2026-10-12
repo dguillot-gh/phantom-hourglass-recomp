@@ -1,0 +1,53 @@
+plugins {
+    id 'com.android.application'
+}
+
+// The game's C comes from a PC build (2-BUILD.ps1: build/release/recomp_generated); SDL's source from the same build.
+def repo = projectDir.parentFile.parentFile
+def slashes = { String p -> p.replace('\\', '/') }  // (CMake reads backslashes as escapes)
+def generated = slashes(project.findProperty('phGeneratedDir') ?: new File(repo, 'build/release/recomp_generated').path)
+def sdlSource = slashes(project.findProperty('phSdlSource') ?: new File(repo, 'build/release/_deps/sdl3-src').path)
+// The CMake that local.properties' cmake.dir points at (5-BUILD-ANDROID.ps1 passes its version): the project needs 3.28+.
+def cmakeVersion = project.findProperty('phCmakeVersion') ?: '3.31.6'
+def ninja = project.findProperty('phNinja')
+
+android {
+    namespace = "com.phrecomp.ph"
+    compileSdkVersion 35
+    ndkVersion = "28.2.13676358"
+    defaultConfig {
+        applicationId "com.phrecomp.ph"
+        minSdkVersion 26
+        targetSdkVersion 35
+        versionCode 1
+        versionName "0.1.0"
+        externalNativeBuild {
+            cmake {
+                arguments "-DANDROID_STL=c++_static", "-DANDROID_PLATFORM=android-26",
+                        "-DFFCC_BUILD_TESTS=OFF", "-DPH_GENERATED_DIR=${generated}",
+                        "-DFETCHCONTENT_SOURCE_DIR_SDL3=${sdlSource}", "-DFETCHCONTENT_FULLY_DISCONNECTED=ON"
+                if (ninja) arguments "-DCMAKE_MAKE_PROGRAM=${slashes(ninja)}"
+                abiFilters 'arm64-v8a'
+                targets 'main', 'ph_game'
+            }
+        }
+    }
+    buildTypes {
+        debug {
+            // The game and the engine are always optimised (CMake), so the debug APK plays at full speed.
+            externalNativeBuild { cmake { arguments "-DCMAKE_BUILD_TYPE=Release" } }
+        }
+        release {
+            minifyEnabled false
+        }
+    }
+    externalNativeBuild {
+        cmake {
+            path '../../CMakeLists.txt'
+            version cmakeVersion
+        }
+    }
+    lint {
+        abortOnError = false
+    }
+}

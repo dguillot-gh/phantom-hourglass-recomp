@@ -1,0 +1,14 @@
+# Recompiler hooks for AZEE (Phantom Hourglass, USA).
+# Format: <module> <address> replace|before|instead <c_function>
+#   replace: the recompiled body is replaced by a call to the C function.
+#   before:  the C function is called on entry, then the recompiled body runs.
+#   instead: the C function (returning int) is called on entry; the recompiled body runs if it returns 0.
+# The decomp leaves these NitroSDK functions unnamed; each was matched by its instructions (same code as CFIE's).
+
+# NitroSDK thread context switches: guest threads run on host fibers (runtime/src/nitro.cpp).
+main 0200dd04 replace ntr_nitro_save_context   # OS_SaveContext
+main 0200dd50 replace ntr_nitro_load_context   # OS_LoadContext
+main 0200dc98 replace ntr_nitro_init_context   # OS_InitContext
+
+# IRQ dispatch: enters OS_IrqHandler_ThreadSwitch explicitly (game/src/ph_hooks.cpp).
+itcm 01ffa48c replace ph_os_irq_handler        # OS_IrqHandler

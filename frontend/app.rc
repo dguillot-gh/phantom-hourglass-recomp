@@ -1,0 +1,3 @@
+// The program's icon (frontend/res/app.ico, drawn by tools/gen_icon.py).
+LANGUAGE 0, 0
+1 ICON "res/app.ico"
