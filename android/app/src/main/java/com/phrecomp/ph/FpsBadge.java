@@ -57,7 +57,9 @@ class FpsBadge extends TextView {
         setVisibility(on ? VISIBLE : GONE);
         removeCallbacks(tick);
         if (on) {
+            bringToFront();  // over the controls and anything added since
             post(tick);
+            requestLayout();
             post(this::place);
         }
     }

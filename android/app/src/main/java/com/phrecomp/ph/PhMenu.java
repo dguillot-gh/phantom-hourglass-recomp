@@ -38,6 +38,7 @@ final class PhMenu {
     private final float dp;
     private FrameLayout root;
     private ScrollView scroll;
+    private LinearLayout list;  // the panel's contents (rebuilt by refresh)
     private int panelW;
     private static final int SLOTS = 12, COLUMNS = 3;
 
@@ -68,7 +69,7 @@ final class PhMenu {
         scroll = new ScrollView(activity);
         scroll.setBackgroundColor(PANEL);
         scroll.setOnClickListener(v -> { });  // taps inside do not close it
-        final LinearLayout list = new LinearLayout(activity);
+        list = new LinearLayout(activity);
         list.setOrientation(LinearLayout.VERTICAL);
         list.setPadding(px(16), px(10), px(16), px(24));
         scroll.addView(list);
@@ -80,12 +81,13 @@ final class PhMenu {
                 ViewGroup.LayoutParams.MATCH_PARENT));
     }
 
-    /** Rebuilds the panel with the new values, keeping the scroll position. */
+    /** Rebuilds the panel's contents with the new values, in place (the panel stays, so it does not flash). */
     private void refresh() {
-        final int y = scroll != null ? scroll.getScrollY() : 0;
-        close();
-        open();
-        if (scroll != null) scroll.post(() -> scroll.scrollTo(0, y));
+        if (root == null) return;
+        final int y = scroll.getScrollY();
+        list.removeAllViews();
+        build(list);
+        scroll.post(() -> scroll.scrollTo(0, y));
     }
 
     // ---- contents ---------------------------------------------------------------------------------------------------
@@ -134,7 +136,6 @@ final class PhMenu {
                 prefs.getBoolean("fps", false), on -> {
                     prefs.edit().putBoolean("fps", on).apply();
                     activity.setFpsShown(on);
-                    refresh();
                 });
         // The renderer: the GPU one (OpenGL ES) draws the DS's 2D and 3D at 2× to 8× its size; the software one is
         // the DS's own picture (1×).
