@@ -468,9 +468,11 @@ private:
             video_dirty = s_.video_dirty;
             s_.video_dirty = false;
         }
-        if (video_dirty) rt_->set_video(video_for(view));
-        // A GPU renderer that could not start falls back to software: say so in the menu.
-        if (view.gpu && rt_->video().renderer == ntr::Renderer::Software && frames_ > 2) s_.gpu_failed = true;
+        if (video_dirty) rt_->set_video(video_for(view)), video_asked_ = frames_;
+        // A GPU renderer that could not start falls back to software: say so in the menu. (The runtime switches
+        // between frames, so until a couple of frames after a change it still reports the renderer it had.)
+        if (view.gpu && rt_->video().renderer == ntr::Renderer::Software && frames_ > video_asked_ + 2)
+            s_.gpu_failed = true;
 
         int w = 0, h = 0;
         SDL_GetWindowSizeInPixels(window_, &w, &h);
@@ -568,6 +570,7 @@ private:
     int save_slot_ = 0, load_slot_ = 0;  // a save or load under way
     std::vector<uint32_t> thumb_;        // the picture of the state being saved
     uint64_t frames_ = 0;
+    uint64_t video_asked_ = 0;  // the frame of the last renderer change asked for
     uint64_t fps_since_ = 0, fps_frames_ = 0;  // (the FPS counter)
     std::chrono::steady_clock::time_point next_{};
     ph::GlPresenter* gl_ = nullptr;  // (null: the phone's fallback, the main thread draws)
