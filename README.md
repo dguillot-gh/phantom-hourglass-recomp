@@ -5,10 +5,6 @@ A native port of **The Legend of Zelda: Phantom Hourglass** (Nintendo DS) to Win
 to C and compiled ahead of time for your machine, instead of being emulated. The rest of the console (the ARM7, graphics
 and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melonDS) core.
 
-![The same scene drawn by the software renderer at the DS's resolution (left) and by the GPU renderer at 4x (right)](docs/images/renderer-1x-vs-4x.png)
-
-*The same moment, at the DS's own resolution (left) and with the GPU renderer at 4x (right).*
-
 > **This repository contains no game data.** You build the game from your own legally dumped cartridge: the scripts
 > recompile your ROM on your PC, and nothing made from it is ever committed or shared. Please do not share the builds
 > you make (the game folder and the APK contain the game).
