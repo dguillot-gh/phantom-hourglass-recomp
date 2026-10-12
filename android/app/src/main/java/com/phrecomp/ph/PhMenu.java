@@ -130,20 +130,12 @@ final class PhMenu {
             PhInput.nativeSetStretch(i == 1);
             refresh();
         }, null);
-        toggle(list, "FPS counter", "The game's frames per second, in a corner of the picture.",
+        toggle(list, "FPS counter", "The game's frames per second. Drag it anywhere on the screen.",
                 prefs.getBoolean("fps", false), on -> {
                     prefs.edit().putBoolean("fps", on).apply();
-                    PhInput.nativeSetFps(on);
+                    activity.setFpsShown(on);
                     refresh();
                 });
-        if (prefs.getBoolean("fps", false)) {
-            chips(list, new String[] {"↖", "↗", "↙", "↘"},
-                    prefs.getInt("fps_corner", 1), i -> {
-                        prefs.edit().putInt("fps_corner", i).apply();
-                        PhInput.nativeSetFpsCorner(i);
-                        refresh();
-                    }, null);
-        }
         // The renderer: the GPU one (OpenGL ES) draws the DS's 2D and 3D at 2× to 8× its size; the software one is
         // the DS's own picture (1×).
         final boolean failed = PhInput.nativeGpuFailed();

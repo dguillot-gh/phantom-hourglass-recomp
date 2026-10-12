@@ -55,4 +55,4 @@ installs over the app); without one Android's own debug key is used.
 Touch the game directly: it is the stylus. The D-pad is on the left; the small buttons are the menu (≡), TOP (the top
 screen), ⟳ (portrait: both screens, like a DS held open), MIC (hold: blow into the microphone) and LID (close the DS).
 The menu switches every control on or off, adds A B X Y, L R and Start/Select, sets their opacity and size, and has
-the renderer (GPU for 2x-6x), the picture size, the FPS counter and the save state slots.
+the renderer (GPU for 2x-6x), the picture size, the FPS counter (drag it anywhere) and the save state slots.

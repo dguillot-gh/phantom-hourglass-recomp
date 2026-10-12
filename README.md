@@ -93,7 +93,7 @@ without installing or building anything. The step-by-step guide is [scripts/READ
 
 Touch the game: it is the stylus. The small buttons are the menu (≡), TOP (the top screen), ⟳ (portrait, both
 screens), MIC (hold to blow) and LID. The menu switches each control on or off, sets their size and opacity, and has
-the renderer, resolution, picture size, FPS counter and the 12 save state slots.
+the renderer, resolution, picture size, FPS counter (drag it anywhere) and the 12 save state slots.
 
 ## How it works
 

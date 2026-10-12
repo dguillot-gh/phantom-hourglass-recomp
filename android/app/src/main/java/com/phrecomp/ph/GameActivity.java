@@ -24,6 +24,7 @@ import java.io.File;
 public class GameActivity extends SDLActivity {
     private DsPad pad;
     private PhMenu menu;
+    private FpsBadge fps;
 
     @Override
     protected String[] getLibraries() {
@@ -42,6 +43,9 @@ public class GameActivity extends SDLActivity {
                 "--scale", String.valueOf(Math.min(6, prefs.getInt("scale", 2))),
         };
     }
+
+    /** The FPS counter on or off (the menu's switch). */
+    void setFpsShown(boolean on) { if (fps != null) fps.setShown(on); }
 
     /** Portrait: the phone held upright with both screens stacked (the Rotate button and the menu's switch). */
     boolean portrait() { return getSharedPreferences(DsPad.PREFS, MODE_PRIVATE).getBoolean("portrait", false); }
@@ -82,12 +86,17 @@ public class GameActivity extends SDLActivity {
         mLayout.addView(pad, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
         final SharedPreferences prefs = getSharedPreferences(DsPad.PREFS, MODE_PRIVATE);
+        // The FPS counter, over the controls: a finger drags it anywhere.
+        fps = new FpsBadge(this, prefs);
+        mLayout.addView(fps, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        mLayout.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> fps.place());
         menu = new PhMenu(this, pad, prefs);
         pad.setMenu(menu);
         // The display choices kept from last time.
         PhInput.nativeSetSmooth(prefs.getBoolean("smooth", false));
-        PhInput.nativeSetFps(prefs.getBoolean("fps", false));
-        PhInput.nativeSetFpsCorner(prefs.getInt("fps_corner", 1));
+        PhInput.nativeSetFps(false);  // (the phone's counter is the FpsBadge, not drawn in the picture)
+        setFpsShown(prefs.getBoolean("fps", false));
         PhInput.nativeSetStretch(prefs.getBoolean("stretch", false));
         if (portrait()) pad.setScreen(PhInput.SCREEN_BOTH);
         hideSystemBars();
