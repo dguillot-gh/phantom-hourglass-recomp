@@ -47,6 +47,8 @@ if(PH_ROM)
     DEPENDS ntr-recomp ${PH_CONFIG}/functions.txt ${PH_CONFIG}/hooks.txt ${PH_CONFIG}/regions.txt "${PH_ROM}"
     COMMENT "Recompiling the game's code from your ROM"
     VERBATIM)
+  # Only the C (what the Android build needs): cmake --build --preset release --target ph_generate
+  add_custom_target(ph_generate DEPENDS ${PH_GEN_SOURCES} ${PH_GEN_DIR}/funcs.h)
 
   # A freestanding shared library: the runtime's services reach it through a table when it is loaded (ntr/recomp.h).
   add_library(ph_game MODULE ${PH_GEN_SOURCES})

@@ -81,7 +81,8 @@ $gradleArgs = @('-classpath', $wrapper, 'org.gradle.wrapper.GradleWrapperMain', 
                 ':app:assembleDebug', "-PphCmakeVersion=$cmakeVersion", "-PphNinja=$ninjaPath",
                 "-PphGeneratedDir=$generated", "-PphSdlSource=$sdlSrc")
 # One signing key for every PC (the PS1 project's): the phone only installs an update signed like the installed app.
-$key = Join-Path $ToolsCache 'debug.keystore'
+# PH_KEYSTORE names it (the build PC's workflow); else debug.keystore in the tools folder.
+$key = if ($env:PH_KEYSTORE) { $env:PH_KEYSTORE } else { Join-Path $ToolsCache 'debug.keystore' }
 if (Test-Path $key) {
     $gradleArgs += @("-Pandroid.injected.signing.store.file=$key", '-Pandroid.injected.signing.store.password=android',
                      '-Pandroid.injected.signing.key.alias=androiddebugkey', '-Pandroid.injected.signing.key.password=android')

@@ -93,6 +93,8 @@ function Refresh-Path {
     Add-Path 'C:\Program Files\CMake\bin'
     Add-Path 'C:\Program Files\LLVM\bin'
     Add-Path (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links')
+    # A tools folder shared with other projects may hold Python, Git and the GitHub CLI too (a build PC's).
+    if ($ToolsCache) { foreach ($d in 'python', 'mingit\cmd', 'gh\bin') { Add-Path (Join-Path $ToolsCache $d) } }
 }
 $Vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
 function Find-VS {

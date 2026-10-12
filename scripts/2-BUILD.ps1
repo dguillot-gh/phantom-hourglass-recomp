@@ -1,9 +1,11 @@
 # 2-BUILD.ps1 -- builds Phantom Hourglass from your ROM (home PC).
 # The recompiler turns the ROM's code into C (ph-recomp\build\release\recomp_generated, never committed), then the
 # game (ph_game.dll) and the program (PhantomHourglass.exe) are compiled. The first build also downloads SDL3.
-#   powershell -NoProfile -ExecutionPolicy Bypass -File 2-BUILD.ps1 [-Clean] [-Jobs N] [-DryRun]
+# -GenerateOnly makes only the C (the recompiler and its output), what the Android build needs: no PC game or program
+# (the build PC, scripts\ci-build.ps1).
+#   powershell -NoProfile -ExecutionPolicy Bypass -File 2-BUILD.ps1 [-Clean] [-Jobs N] [-GenerateOnly] [-DryRun]
 [CmdletBinding()]
-param([switch] $Clean, [int] $Jobs = 0, [switch] $DryRun)
+param([switch] $Clean, [int] $Jobs = 0, [switch] $GenerateOnly, [switch] $DryRun)
 . (Join-Path $PSScriptRoot 'ph-common.ps1')
 
 $rom = Find-Rom
@@ -35,6 +37,14 @@ try {
     $jobArgs = @()
     if ($Jobs -gt 0) { $jobArgs = @('-j', "$Jobs") }
     $t0 = Get-Date
+    if ($GenerateOnly) {
+        Run 'build: recompile the ROM to C only (for the Android build)' { cmake --build --preset release --target ph_generate @jobArgs }
+        $func = Join-Path $BuildDir 'recomp_generated\func_table.c'
+        if ($DryRun) { Step "would produce $func"; Step 'DRY RUN OK'; exit 0 }
+        if (-not (Test-Path $func)) { Fail "the build finished but $func is missing" }
+        Step ("C generated in {0:N1} min: $func" -f ((Get-Date) - $t0).TotalMinutes)
+        exit 0
+    }
     Run 'build: recompile the ROM, compile the game and the program (10-30+ min the first time)' { cmake --build --preset release @jobArgs }
     if (-not $DryRun) { Step ("build done in {0:N1} min" -f ((Get-Date) - $t0).TotalMinutes) }
     # The phone's GPU renderer on the PC: the program again with the phone's OpenGL ES shaders and shims (the
