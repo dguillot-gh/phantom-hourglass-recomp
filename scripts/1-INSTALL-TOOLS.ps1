@@ -32,7 +32,16 @@ foreach ($m in $missing) {
             $p = Start-Process -FilePath $setup -Verb RunAs -Wait -PassThru -ArgumentList @('modify', '--installPath', "`"$vs`"",
                 '--add', 'Microsoft.VisualStudio.Component.Windows11SDK.26100', '--passive', '--norestart')
             Add-Content -Path $Log -Value "Visual Studio Installer exit code: $($p.ExitCode)"
-            if (-not (Find-WinSdk)) { Fail "the Windows SDK is still missing (winget, then the Visual Studio Installer: exit $($p.ExitCode)); add it in Visual Studio Installer: Modify, Individual components, Windows 11 SDK" }
+            if (-not (Find-WinSdk)) {
+                # Windows lists the SDK as installed but its files are gone: installers then skip it and repair does not
+                # bring the files back. Only removing it and installing it again does.
+                $kitsLib = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\Lib'
+                if (-not (Test-Path $kitsLib)) {
+                    Fail ("the Windows SDK is listed as installed but its files are gone ($kitsLib is missing). " +
+                          "Settings > Apps > Installed apps: uninstall every 'Windows Software Development Kit', then run this again")
+                }
+                Fail "the Windows SDK is still missing (winget, then the Visual Studio Installer: exit $($p.ExitCode)); add it in Visual Studio Installer: Modify, Individual components, Windows 11 SDK"
+            }
         }
     } else {
         $id = $m
