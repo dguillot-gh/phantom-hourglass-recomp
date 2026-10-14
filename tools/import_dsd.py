@@ -65,6 +65,26 @@ def load_existing_names(path: Path) -> dict[tuple[str, int], str]:
     return names
 
 
+def load_names_file(path: Path) -> dict[tuple[str, int], str]:
+    """names.txt beside the function list: '[module]' headers and '<address> <name>' lines (committed; e.g. names a
+    decomp of another release gives this one, matched by nds-recomp-manager's tools/align_names.py)."""
+    names: dict[tuple[str, int], str] = {}
+    if not path.exists():
+        return names
+    module = ""
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        if line.startswith("["):
+            module = line.strip("[]")
+            continue
+        cols = line.split()
+        if len(cols) >= 2:
+            names[(module, int(cols[0], 16))] = cols[1]
+    return names
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("dsd_arm9_config", type=Path, help="dsd config dir for arm9 (contains symbols.txt)")
@@ -79,8 +99,10 @@ def main() -> int:
         modules.append((ov.name, ov / "symbols.txt"))
 
     existing = load_existing_names(args.output)
+    known = load_names_file(args.output.parent / "names.txt")
     lines = [HEADER.format(code=args.code)]
     total = 0
+    named = 0
     for module, sym_path in modules:
         if not sym_path.exists():
             continue
@@ -89,10 +111,11 @@ def main() -> int:
             continue
         lines.append(f"\n[{module}]\n")
         for addr, size, mode, name, flags in funcs:
-            name = name or existing.get((module, addr), "")
+            name = name or known.get((module, addr), "") or existing.get((module, addr), "")
             cols = [f"{addr:08x}", f"{size:x}", mode]
             if name:
                 cols.append(name)
+                named += 1
             elif flags:
                 cols.append("-")
             cols += flags
@@ -101,7 +124,7 @@ def main() -> int:
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text("".join(lines), newline="\n")
-    print(f"wrote {total} functions in {len(modules)} module(s) to {args.output}")
+    print(f"wrote {total} functions ({named} named) in {len(modules)} module(s) to {args.output}")
     return 0
 
 
