@@ -17,7 +17,8 @@ $need = @('CMakeLists.txt', 'CMakePresets.json', 'third_party\CMakeLists.txt', '
           'recompiler\src\main.cpp')
 foreach ($n in $need) { if (-not (Test-Path (Join-Path $Repo $n))) { Fail "missing $Repo\$n" } }
 if (-not (Test-Path (Join-Path $Repo 'third_party\melonDS\src\NDS.cpp'))) {
-    Run 'fetch the melonDS submodule' { git -C $Repo submodule update --init --depth 1 }
+    # (safe.directory: a copy made on another PC belongs to another Windows user, which git refuses by default)
+    Run 'fetch the melonDS submodule' { git -c 'safe.directory=*' -C $Repo submodule update --init --depth 1 }
 }
 Step "source tree OK"
 
