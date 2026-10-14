@@ -29,6 +29,8 @@ if ($missing.Count -gt 0) {
 }
 Use-MSVC
 
+$null = Clear-IfMoved $BuildDir
+$null = Clear-IfMoved (Join-Path $Repo 'build\gles-test')
 if ($Clean -and (Test-Path $BuildDir)) {
     if ($DryRun) { Step "would remove $BuildDir" } else { Step "clean: removing $BuildDir"; Remove-Item -Recurse -Force $BuildDir }
 }

@@ -190,3 +190,24 @@ function Find-Adb {
     if ($c) { return $c.Source }
     return $null
 }
+
+# ---- a build folder made at another path ----------------------------------------------------------------------------
+# The drive has a different letter on each PC (F:, J:, D:): CMake refuses a build folder whose cache was made for another
+# source path, and another PC's compilers would not fit it anyway. Such a folder is removed, so it is made again here.
+function Clear-IfMoved([string] $dir) {
+    if (-not (Test-Path $dir)) { return $false }
+    $here = ($Repo -replace '\\', '/') -replace '/+$', ''
+    $caches = @(Get-ChildItem -Path $dir -Filter 'CMakeCache.txt' -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 8)
+    foreach ($c in $caches) {
+        $m = Select-String -Path $c.FullName -Pattern '^CMAKE_HOME_DIRECTORY:INTERNAL=(.*)$' | Select-Object -First 1
+        if (-not $m) { continue }
+        $made = ($m.Matches[0].Groups[1].Value -replace '\\', '/') -replace '/+$', ''
+        if (-not ($made -like "$here*")) {
+            if ($DryRun) { Step "would remove $dir (made at $made, now $here)"; return $true }
+            Step "removing $($dir): it was made at $made (the drive had another letter there); it is made again here"
+            Remove-Item -Recurse -Force $dir
+            return $true
+        }
+    }
+    return $false
+}
