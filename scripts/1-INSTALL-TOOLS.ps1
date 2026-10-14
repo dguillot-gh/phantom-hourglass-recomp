@@ -25,6 +25,13 @@ foreach ($m in $missing) {
             winget install --id Microsoft.WindowsSDK.10.0.26100 -e --accept-package-agreements --accept-source-agreements
         }
         if (-not $DryRun -and -not (Find-WinSdk)) {
+            # Listed as installed but its files gone (and Windows' installer cache too): 26100 can be neither repaired nor
+            # removed. A newer SDK that Windows has no record of installs fresh, and vcvars uses the newest one with files.
+            $null = Run-Optional 'install the newer Windows SDK (Microsoft.WindowsSDK.10.0.28000, about 2 GB)' {
+                winget install --id Microsoft.WindowsSDK.10.0.28000 -e --accept-package-agreements --accept-source-agreements
+            }
+        }
+        if (-not $DryRun -and -not (Find-WinSdk)) {
             $vs = Find-VS
             $setup = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\setup.exe'
             Step 'add the Windows SDK to Build Tools with the Visual Studio Installer (Microsoft.VisualStudio.Component.Windows11SDK.26100; asks for admin)'
@@ -38,7 +45,8 @@ foreach ($m in $missing) {
                 $kitsLib = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\Lib'
                 if (-not (Test-Path $kitsLib)) {
                     Fail ("the Windows SDK is listed as installed but its files are gone ($kitsLib is missing). " +
-                          "Settings > Apps > Installed apps: uninstall every 'Windows Software Development Kit', then run this again")
+                          "install a newer SDK by hand (winget install --id Microsoft.WindowsSDK.10.0.28000), or uninstall every " +
+                          "'Windows Software Development Kit' (Settings > Apps), then run this again")
                 }
                 Fail "the Windows SDK is still missing (winget, then the Visual Studio Installer: exit $($p.ExitCode)); add it in Visual Studio Installer: Modify, Individual components, Windows 11 SDK"
             }
