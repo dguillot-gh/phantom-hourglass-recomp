@@ -19,16 +19,20 @@ foreach ($m in $missing) {
             winget install --id Microsoft.VisualStudio.2022.BuildTools -e --accept-package-agreements --accept-source-agreements --override '--passive --wait --add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.Windows11SDK.26100 --includeRecommended'
         }
     } elseif ($m -eq 'WindowsSDK') {
-        # Build Tools is there without the SDK: add it with the Visual Studio Installer (asks for admin).
-        $vs = Find-VS
-        $setup = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\setup.exe'
-        if ($DryRun) { Step "would add the Windows SDK to $vs with $setup" }
-        else {
-            Step 'add the Windows SDK to Build Tools (Microsoft.VisualStudio.Component.Windows11SDK.26100; asks for admin, about 2 GB)'
+        # Build Tools is there without the SDK. First the standalone Windows SDK with winget (like the other tools), then,
+        # if that did not bring it, the Visual Studio Installer adds it to Build Tools (asks for admin).
+        $ok = Run-Optional 'install the Windows SDK (Microsoft.WindowsSDK.10.0.26100, about 2 GB)' {
+            winget install --id Microsoft.WindowsSDK.10.0.26100 -e --accept-package-agreements --accept-source-agreements
+        }
+        if (-not $DryRun -and -not (Find-WinSdk)) {
+            $vs = Find-VS
+            $setup = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\setup.exe'
+            Step 'add the Windows SDK to Build Tools with the Visual Studio Installer (Microsoft.VisualStudio.Component.Windows11SDK.26100; asks for admin)'
+            # (No --wait: that is the Build Tools bootstrapper's option; setup.exe rejects it with exit 87.)
             $p = Start-Process -FilePath $setup -Verb RunAs -Wait -PassThru -ArgumentList @('modify', '--installPath', "`"$vs`"",
-                '--add', 'Microsoft.VisualStudio.Component.Windows11SDK.26100', '--passive', '--norestart', '--wait')
+                '--add', 'Microsoft.VisualStudio.Component.Windows11SDK.26100', '--passive', '--norestart')
             Add-Content -Path $Log -Value "Visual Studio Installer exit code: $($p.ExitCode)"
-            if (-not (Find-WinSdk)) { Fail "the Windows SDK is still missing after the Visual Studio Installer (exit $($p.ExitCode)); add it in Visual Studio Installer: Modify, Individual components, Windows 11 SDK" }
+            if (-not (Find-WinSdk)) { Fail "the Windows SDK is still missing (winget, then the Visual Studio Installer: exit $($p.ExitCode)); add it in Visual Studio Installer: Modify, Individual components, Windows 11 SDK" }
         }
     } else {
         $id = $m
