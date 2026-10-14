@@ -103,6 +103,14 @@ function Find-VS {
     if ($p) { return "$p".Trim() }
     return $null
 }
+# The Windows SDK (kernel32.lib and the other system libraries the linker needs). Build Tools' C++ workload does not
+# always bring it (2026-10-14, a fresh laptop): checked on its own.
+function Find-WinSdk {
+    $kits = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\Lib'
+    $lib = @(Get-ChildItem -Path (Join-Path $kits '*\um\x64\kernel32.lib') -ErrorAction SilentlyContinue) | Select-Object -First 1
+    if ($lib) { return $lib.FullName }
+    return $null
+}
 function Get-CMakeVersionOk {
     if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) { return $false }
     $first = "$((& cmake --version) | Select-Object -First 1)"
@@ -119,6 +127,7 @@ function Get-MissingTools {
     if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) { $missing += 'Ninja-build.Ninja' }
     if (-not (Get-Command clang-cl -ErrorAction SilentlyContinue)) { $missing += 'LLVM.LLVM' }
     if (-not (Find-VS)) { $missing += 'Microsoft.VisualStudio.2022.BuildTools' }
+    elseif (-not (Find-WinSdk)) { $missing += 'WindowsSDK' }
     return $missing
 }
 # Loads vcvars64 (MSVC headers, libraries, Windows SDK) into this session, keeping CMake 3.28+ and LLVM first.
@@ -134,6 +143,10 @@ function Use-MSVC {
         if ($_ -match '^([^=]+)=(.*)$') { Set-Item -Path "env:$($matches[1])" -Value $matches[2] }
     }
     $env:PATH = "C:\Program Files\CMake\bin;C:\Program Files\LLVM\bin;$env:PATH"
+    if (-not (Find-WinSdk)) {
+        if ($DryRun) { Step 'no Windows SDK yet (1-INSTALL-TOOLS.ps1 adds it)' }
+        else { Fail 'the Windows SDK is missing (kernel32.lib): run 1-INSTALL-TOOLS.ps1 (NDS Manager: Set up this PC)' }
+    }
     foreach ($t in 'cmake', 'ninja', 'clang-cl', 'lld-link') {
         $c = Get-Command $t -ErrorAction SilentlyContinue
         if (-not $c) {
