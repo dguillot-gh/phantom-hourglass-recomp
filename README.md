@@ -22,7 +22,6 @@ and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melo
 - An FPS counter, a side menu on both platforms, and the game's own saves kept as `.sav` files.
 
 <p>
-  <img src="docs/images/file-select.png" width="256" alt="The file select screen">
   <img src="docs/images/phone-renderer-4x.png" width="256" alt="The title screen at 4x with the phone's renderer">
 </p>
 
