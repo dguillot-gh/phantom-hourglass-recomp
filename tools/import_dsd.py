@@ -40,7 +40,8 @@ def parse_symbols(path: Path) -> list[tuple[int, int, str, str, list[str]]]:
         mode = "a" if props.startswith("arm") else "t"
         size_m = re.search(r"size=0x([0-9a-fA-F]+)", props)
         size = int(size_m.group(1), 16) if size_m else 0
-        flags = ["!dsprot"] if "dsprot_range" in props else []
+        # (older dsd: dsprot_range=...; newer: dsprot=0x68 or dsprot=(size,key))
+        flags = ["!dsprot"] if re.search(r"\bdsprot(_range)?=", props) else []
         name = m.group("name")
         out.append((int(m.group("addr"), 16), size, mode, "" if AUTO_NAME_RE.match(name) else name, flags))
     out.sort()
