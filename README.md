@@ -26,6 +26,13 @@ and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melo
   <img src="docs/images/phone-renderer-4x.png" width="256" alt="The title screen at 4x with the phone's renderer">
 </p>
 
+## Tested on
+
+- **Phone:** Google Pixel 8. Other phones should work (Android 8 or newer, 64-bit ARM) but have not been tried, and GPU
+  drivers differ: if the picture looks wrong, the software renderer (1x, in the menu) is the safe fallback.
+- **PC:** Windows 11.
+- **Status:** plays on PC and on the Pixel 8. On the phone the GPU renderer at 6x can stutter once the phone warms up; 3x holds a steady 60 fps.
+
 ## What you need
 
 - Your own dump of the game. Supported (checked by SHA-1):
@@ -68,6 +75,28 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ph-recomp\scripts\RUN-ANDROI
 It gets Java 17 and the Android SDK if you do not have them (asking you to accept Android's SDK licence), builds the
 APK and installs it on the phone over USB debugging, with your ROM. Every script takes `-DryRun` to check everything
 without installing or building anything. The step-by-step guide is [scripts/README.md](scripts/README.md).
+
+## What the scripts do to your PC
+
+The scripts are plain text in `scripts\`: read any of them before running it. Add `-DryRun` to any script to see what
+it would do without installing or building anything. Each one writes a log to `logs\` in the workspace (the folder
+that holds this repository).
+
+| Script | What it does | What it changes on your PC |
+|---|---|---|
+| `1-INSTALL-TOOLS.ps1` | Checks for the build tools; installs the missing ones with winget (Windows' package manager) | Installs Git, Python 3, CMake, Ninja, LLVM and Visual Studio 2022 Build Tools (C++ and the Windows SDK): ordinary programs, removable in Settings > Apps. Build Tools and the SDK ask for admin once. |
+| `ANDROID-TOOLS.ps1` | Uses the Java 17 and Android SDK you already have, or gets them | Java 17 (Microsoft OpenJDK, winget); Google's Android command-line tools and SDK parts (platform 35, NDK) into the tools folder. Shows Android's licence for you to accept. |
+| `2-BUILD.ps1` | Recompiles your ROM's code to C and compiles the game and the program | Reads your ROM, never changes it. Downloads melonDS and SDL3 from GitHub the first time. Writes only inside `ph-recomp\build`. |
+| `3-MAKE-GAME-FOLDER.ps1` | Makes `PhantomHourglass\` in the workspace: the game, ready to play | Copies the program and your ROM there; never overwrites a save. |
+| `4-TEST.ps1` | Plays the game by itself for about a minute and takes screenshots | Works on copies of your save, in the logs folder. |
+| `5-BUILD-ANDROID.ps1` | Builds the phone app (APK) into `apks\` | Gradle downloads Android libraries from Google and Maven Central the first time. |
+| `6-INSTALL-PHONE.ps1` | Installs the app on your phone over USB | Copies your ROM into the app, and a save only if the phone has none; never replaces a save on the phone. |
+| `RUN-ALL.ps1`, `RUN-ANDROID.ps1` | Run the steps above in order, stopping at the first that fails | Nothing more than the steps they run. |
+| `ci-build.ps1` | For a build PC that makes the APK by itself on every push ([BUILD-PC.md](scripts/BUILD-PC.md)) | Uploads the APK to a private GitHub repository you name. No other script runs it. |
+
+Nothing is uploaded or sent anywhere (except by `ci-build.ps1`, which only runs when you start it on purpose). Nothing is left running in the background or set to start with Windows, and
+no system settings are changed beyond what the installers above do themselves. Everything the build makes stays in the
+workspace and the tools folder.
 
 ## Playing on a PC
 
