@@ -1,13 +1,13 @@
 # Building Phantom Hourglass, step by step
 
-The scripts build everything into the *workspace*: the folder that holds this repository (`ph-recomp\`). Put your ROM
-there (any file name; it is found by its SHA-1). They only ever read the ROM.
+The scripts build everything into the *workspace*: the folder that holds this repository (`ph-recomp\`). Put your ROM in its
+`roms\` folder (any file name; it is found by its SHA-1; loose in the workspace works too). They only ever read the ROM.
 
 ```
 workspace\
   ph-recomp\                 the repository (these scripts are in ph-recomp\scripts)
-  your-dump.nds              your ROM
-  PhantomHourglass\          made by step 3: the game, ready to play (do not share it: it contains the game)
+  roms\your-dump.nds         your ROM
+  games\PhantomHourglass\    made by step 3: the game, ready to play (do not share it: it contains the game)
   apks\                      made by RUN-ANDROID: the phone app (the same)
   logs\                      every step's log, and the test's screenshots
 ```

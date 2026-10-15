@@ -8,12 +8,20 @@
   "romFile": "azee.nds",
   "saveFile": "azee.sav",
   "github": "dguillot-gh/phantom-hourglass-recomp",
-  "romDirs": ["The_Legend_of_Zelda_Phantom_Hourglass_USA_DPAD-Patch"],
+  "romDirs": [
+    "roms",
+    "roms/The_Legend_of_Zelda_Phantom_Hourglass_USA_DPAD-Patch"
+  ],
   "roms": {
     "4c8f52dd719918bbcd46e73a8bae8628139c1b85": "USA (clean)",
     "7e0d26d143992f1eee182b24f1abb9e7f038eacf": "USA (D-pad patch)"
   },
   "variants": [
-    { "id": "", "label": "", "gameFolder": "PhantomHourglass", "apk": "PhantomHourglass-latest.apk" }
+    {
+      "id": "",
+      "label": "",
+      "gameFolder": "games/PhantomHourglass",
+      "apk": "PhantomHourglass-latest.apk"
+    }
   ]
 }

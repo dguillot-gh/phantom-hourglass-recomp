@@ -6,11 +6,16 @@ $ErrorActionPreference = 'Stop'
 # game folder, the logs and the APKs go there, outside the repo.
 $Repo = Split-Path -Parent $PSScriptRoot
 $Root = Split-Path -Parent $Repo
-$RomDir = Join-Path $Root 'The_Legend_of_Zelda_Phantom_Hourglass_USA_DPAD-Patch'
+# The workspace's folders (its START-HERE.md): your ROMs and patches, the finished PC games, and what the build
+# makes on the way. ROMs are also still found loose in the workspace itself.
+$RomsDir = Join-Path $Root 'roms'
+$GamesDir = Join-Path $Root 'games'
+$WorkDir = Join-Path $Root 'work'
+$RomDir = Join-Path $RomsDir 'The_Legend_of_Zelda_Phantom_Hourglass_USA_DPAD-Patch'
 # Your latest progress is in the .ml1.sav (written after the plain .sav; the two differ).
 $MelonSave = Join-Path $RomDir 'The_Legend_of_Zelda_Phantom_Hourglass_USA_DPAD-Patch.ml1.sav'
 $BuildDir = Join-Path $Repo 'build\release'
-$GameDir = Join-Path $Root 'PhantomHourglass'      # the finished, ready-to-play folder (step 3)
+$GameDir = Join-Path $GamesDir 'PhantomHourglass'      # the finished, ready-to-play folder (step 3)
 $LogDir = Join-Path $Root 'logs'
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 $Stamp = Get-Date -Format 'yyyyMMdd-HHmm'
@@ -69,7 +74,7 @@ $KnownRoms = @{
 }
 function Find-Rom {
     $found = ''
-    $candidates = @(Get-ChildItem -Path $Root, $RomDir -Filter '*.nds' -File -ErrorAction SilentlyContinue)
+    $candidates = @(Get-ChildItem -Path $Root, $RomsDir, $RomDir -Filter '*.nds' -File -ErrorAction SilentlyContinue)
     foreach ($c in $candidates) {
         $h = (Get-FileHash -Algorithm SHA1 -LiteralPath $c.FullName).Hash.ToLower()
         if ($KnownRoms.ContainsKey($h)) {

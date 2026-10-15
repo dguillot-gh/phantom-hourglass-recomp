@@ -19,7 +19,7 @@ $drive = Get-PSDrive -Name ((Split-Path -Qualifier $Root).TrimEnd(':')) -ErrorAc
 if ($drive -and $drive.Free -lt 8GB) { Fail ("only {0:N1} GB free on {1}: at least 8 GB is needed" -f ($drive.Free / 1GB), $drive.Name) }
 
 # ---- the ROM ----
-$have = @(Get-ChildItem -Path $Root, $RomDir -Filter '*.nds' -File -ErrorAction SilentlyContinue)  # (where Find-Rom looks)
+$have = @(Get-ChildItem -Path $Root, $RomsDir, $RomDir -Filter '*.nds' -File -ErrorAction SilentlyContinue)  # (where Find-Rom looks)
 if ($have.Count -eq 0) {
     if (-not $RomSource) { Fail "no ROM in $Root and no -RomSource (or PH_ROM_SOURCE) to copy one from" }
     if (-not (Test-Path -LiteralPath $RomSource)) { Fail "the ROM folder $RomSource cannot be reached (NAS password saved for this user? BUILD-PC.md)" }
