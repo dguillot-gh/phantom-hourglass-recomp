@@ -696,7 +696,18 @@ const NtrFuncEntry* RuntimeImpl::lookup(u32 target) {
     auto it = functions_.find(target);
     if (it == functions_.end()) return nullptr;
     const auto& cands = it->second;
-    if (cands.size() == 1) return cands[0];
+    if (cands.size() == 1) {
+        // A function of one overlay only: still only if that overlay is the one in memory. Overlays share run
+        // addresses, so another one may be resident with real code there that the recompiler has no entry for; it is
+        // then interpreted. (Dragon Quest IX: a call to 021d8e1c ran overlay 29's "function" there, which is data,
+        // while another overlay of the 021d8a40 slot was loaded.)
+        const NtrFuncEntry* e = cands[0];
+        if (e->module >= NTR_MODULE_OVERLAY(0)) {
+            const u32 id = e->module - NTR_MODULE_OVERLAY(0);
+            if (id < overlays_by_id_.size() && overlays_by_id_[id] && !overlay_resident(*overlays_by_id_[id])) return nullptr;
+        }
+        return e;
+    }
     // A resident overlay (or code region copied over static code) wins over the static module beneath it.
     const NtrFuncEntry* fixed = nullptr;
     for (const NtrFuncEntry* e : cands) {
