@@ -19,6 +19,9 @@ foreach ($n in $need) { if (-not (Test-Path (Join-Path $Repo $n))) { Fail "missi
 if (-not (Test-Path (Join-Path $Repo 'third_party\melonDS\src\NDS.cpp'))) {
     # (safe.directory: a copy made on another PC belongs to another Windows user, which git refuses by default)
     Run 'fetch the melonDS submodule' { git -c 'safe.directory=*' -C $Repo submodule update --init --depth 1 }
+    if (-not $DryRun -and -not (Test-Path (Join-Path $Repo 'third_party\melonDS\src\NDS.cpp'))) {
+        Fail 'melonDS is still missing after the fetch: the repository has no submodule link for third_party\melonDS (git ls-files -s third_party/melonDS shows none)'
+    }
 }
 Step "source tree OK"
 
