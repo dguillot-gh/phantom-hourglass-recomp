@@ -184,21 +184,17 @@ ffcc_patch(ndscart_src NDSCart.cpp "        delay += ((ROMCnt >> 16) & 0x3F);\n\
   "        delay += ((ROMCnt >> 16) & 0x3F);\n    if (FfccFastCart) { xfercycle = 1; delay = 4; } // ffcc patch\n\n    Parent.NDS.ScheduleEvent(ROMTransferEvent, false, xfercycle * delay, ROMTransfer_ReceiveData, 0);\n")
 ffcc_write_patched(ndscart_src ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/NDSCart.cpp)
 
-# The compute renderer, also on the phone (ph patch): OpenGL ES 3.2 shaders in GPU3D_Compute.cpp (its header there, beside
-# it, so its #include "GPU3D_Compute_shaders.h" finds the patched one). tools/check_gles_compute.py checks them.
+# The compute renderer, also on the phone (ph patch): OpenGL ES 3.2 shaders in GPU3D_Compute.cpp, and its shader header
+# made GLSL ES by gles_compute_fixes.cmake (written beside it, so its #include "GPU3D_Compute_shaders.h" finds that).
+# tools/check_gles_compute.py checks them.
 file(READ ${MS}/GPU3D_Compute.cpp gpu3d_compute_src)
 string(REPLACE "\r\n" "\n" gpu3d_compute_src "${gpu3d_compute_src}")
 ffcc_patch(gpu3d_compute_src GPU3D_Compute.cpp "    shaderSource += \"#version 430 core\\n\";\n"
-  "#ifdef __ANDROID__\n    // ph patch: OpenGL ES 3.2 on the phone. GLSL ES has none of desktop GLSL's implicit int-to-uint conversions,\n    // which these shaders lean on everywhere: GL_EXT_shader_implicit_conversions gives them back (the runtime\n    // picks this renderer only when the driver has it). Every sampler and image type needs a precision.\n    shaderSource += \"#version 320 es\\n#extension GL_EXT_shader_implicit_conversions : require\\n\"\n                    \"precision highp float;\\nprecision highp int;\\nprecision highp usampler2D;\\n\"\n                    \"precision highp usampler2DArray;\\nprecision highp sampler2DArray;\\n\"\n                    \"precision highp uimageBuffer;\\nprecision highp image2D;\\n\";\n#else\n    shaderSource += \"#version 430 core\\n\";\n#endif\n")
+  "#ifdef __ANDROID__\n    // ph patch: OpenGL ES 3.2 on the phone (its shaders made GLSL ES by third_party/gles_compute_fixes.cmake).\n    // Every sampler and image type needs a precision.\n    shaderSource += \"#version 320 es\\n\"\n                    \"precision highp float;\\nprecision highp int;\\nprecision highp usampler2D;\\n\"\n                    \"precision highp usampler2DArray;\\nprecision highp sampler2DArray;\\n\"\n                    \"precision highp uimageBuffer;\\nprecision highp image2D;\\n\";\n#else\n    shaderSource += \"#version 430 core\\n\";\n#endif\n")
 ffcc_write_patched(gpu3d_compute_src ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/GPU3D_Compute.cpp)
 file(READ ${MS}/GPU3D_Compute_shaders.h gpu3d_compute_sh)
 string(REPLACE "\r\n" "\n" gpu3d_compute_sh "${gpu3d_compute_sh}")
-ffcc_patch(gpu3d_compute_sh GPU3D_Compute_shaders.h "            r = min(r + int(bitfieldExtract(tooncolor, 0, 8)), 63);\n"
-  "            r = min(r + bitfieldExtract(tooncolor, 0, 8), 63U); // ph patch (uint: ambiguous in GLSL ES)\n")
-ffcc_patch(gpu3d_compute_sh GPU3D_Compute_shaders.h "            g = min(g + int(bitfieldExtract(tooncolor, 8, 8)), 63);\n"
-  "            g = min(g + bitfieldExtract(tooncolor, 8, 8), 63U); // ph patch (uint: ambiguous in GLSL ES)\n")
-ffcc_patch(gpu3d_compute_sh GPU3D_Compute_shaders.h "            b = min(b + int(bitfieldExtract(tooncolor, 16, 8)), 63);\n"
-  "            b = min(b + bitfieldExtract(tooncolor, 16, 8), 63U); // ph patch (uint: ambiguous in GLSL ES)\n")
+include(${CMAKE_CURRENT_SOURCE_DIR}/gles_compute_fixes.cmake)  # (the GLSL ES fixes, for the phone)
 ffcc_write_patched(gpu3d_compute_sh ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/GPU3D_Compute_shaders.h)
 
 set(melonDS_HOMEPAGE_URL "https://melonds.kuribo64.net")

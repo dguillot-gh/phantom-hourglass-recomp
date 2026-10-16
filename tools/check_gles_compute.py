@@ -1,13 +1,13 @@
 """Checks melonDS's compute renderer shaders as OpenGL ES 3.2 (the phone's compute renderer) with the NDK's glslc.
-GLSL ES lacks desktop GLSL's implicit int-to-uint conversions, which these shaders use everywhere: the phone compiles them
-with GL_EXT_shader_implicit_conversions (the runtime uses this renderer only when the driver has it), and so does this.
+GLSL ES lacks desktop GLSL's implicit int-to-uint conversions, which these shaders use everywhere:
+third_party/gles_compute_fixes.cmake writes them out; this runs it (CMake in script mode) on melonDS's header first.
 
 Reads the shaders from GPU3D_Compute_shaders.h (ours where third_party/CMakeLists.txt patches it, else melonDS's),
 puts each of the 33 variants together the way ComputeRenderer3D::CompileShader does (version line, its #defines, the
 tile constants for a scale, the Common part, the shader), with the ES header the renderer uses on the phone, and
 compiles each one as GLSL ES 3.20. Nothing is built: this is the check that can run anywhere the NDK is.
 
-    python tools/check_gles_compute.py <glslc.exe> [patched GPU3D_Compute_shaders.h] [scale]
+    python tools/check_gles_compute.py <cmake.exe> <glslc.exe> [scale]
 """
 import os
 import re
@@ -20,7 +20,6 @@ HEADER = os.path.join(ROOT, "third_party", "melonDS", "src", "GPU3D_Compute_shad
 
 # The ES header (third_party/CMakeLists.txt puts the same in GPU3D_Compute.cpp on the phone).
 ES_HEAD = """#version 320 es
-#extension GL_EXT_shader_implicit_conversions : require
 precision highp float;
 precision highp int;
 precision highp usampler2D;
@@ -99,18 +98,27 @@ def assemble(parts, name, defines, c):
 
 
 def main():
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 3:
         print(__doc__)
         return 2
-    glslc = sys.argv[1]
-    header = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] != "-" else HEADER
+    cmake, glslc = sys.argv[1], sys.argv[2]
     scale = int(sys.argv[3]) if len(sys.argv) > 3 else 4
-    text = open(header, encoding="utf-8").read().replace("\r\n", "\n")
-    for i, ch in enumerate("rgb"):  # (third_party/CMakeLists.txt's fixes, when checking melonDS's own header)
-        text = text.replace("%s = min(%s + int(bitfieldExtract(tooncolor, %d, 8)), 63);" % (ch, ch, 8 * i),
-                            "%s = min(%s + bitfieldExtract(tooncolor, %d, 8), 63U);" % (ch, ch, 8 * i))
-    parts = parse(text)
     out = tempfile.mkdtemp(prefix="gles-compute-")
+    # The fixes, as the build applies them.
+    fixed = os.path.join(out, "GPU3D_Compute_shaders.h")
+    script = os.path.join(out, "fix.cmake")
+    with open(script, "w", encoding="utf-8") as f:
+        f.write('file(READ "${HEADER}" gpu3d_compute_sh)\n'
+                'string(REPLACE "\\r\\n" "\\n" gpu3d_compute_sh "${gpu3d_compute_sh}")\n'
+                'include("${FIXES}")\n'
+                'file(WRITE "${OUT}" "${gpu3d_compute_sh}")\n')
+    fixes = os.path.join(ROOT, "third_party", "gles_compute_fixes.cmake")
+    r = subprocess.run([cmake, "-D", "HEADER=" + HEADER.replace("\\", "/"), "-D", "FIXES=" + fixes.replace("\\", "/"),
+                        "-D", "OUT=" + fixed.replace("\\", "/"), "-P", script], capture_output=True, text=True)
+    if r.returncode:
+        print(r.stdout + r.stderr)
+        return 1
+    parts = parse(open(fixed, encoding="utf-8").read())
     failed = 0
     seen = {}
     for name, defines in VARIANTS:

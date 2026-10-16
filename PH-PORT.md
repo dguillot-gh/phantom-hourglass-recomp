@@ -126,3 +126,7 @@ shares the config with the clean dump (sha1 4c8f52dd...). melonDS's ROM list giv
     glTexBuffer, glDebugMessageCallback, glDeleteSamplers. Phone compute capped at 4x (tile memory).
     If the Pixel lacks the extension: the 162 lines need explicit uint casts (the checker without the #extension
     line lists them).
+  - Pixel 8 (Mali-G715, driver r54p3) lacks GL_EXT_shader_implicit_conversions (logcat, 116 extensions). So
+    third_party/gles_compute_fixes.cmake now writes out every int-to-uint conversion (97 fixes, each the conversion
+    desktop GLSL makes by itself; the PC compiles the same fixed shaders): all 33 variants compile as GLSL ES 3.20
+    without the extension and as desktop GLSL 4.30, 2x-8x. The runtime needs only ES 3.1 + the compute functions.
