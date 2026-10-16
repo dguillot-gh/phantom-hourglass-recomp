@@ -115,3 +115,14 @@ shares the config with the clean dump (sha1 4c8f52dd...). melonDS's ROM list giv
     deferred) appears to apply a later state to earlier draws, so repeating textures came out clamped and smeared.
     Now a sampler object per wrap mode is bound for each draw and unbound after (ph patch in
     third_party/CMakeLists.txt, GPU3D_OpenGL.cpp); gles_compat loads glGenSamplers/glBindSampler/glSamplerParameteri.
+  - Streaks: also on the PC's GPU renderer (not GLES after all); the compute renderer (now in the menus) has none.
+  - Compute renderer on the phone (2026-10-16, written, not built): melonDS's compute shaders need no 64-bit ints (only
+    in comments) and nothing ES 3.1/3.2 lacks, except desktop GLSL's implicit int-to-uint conversions (162 lines). The
+    phone compiles them with GL_EXT_shader_implicit_conversions; the runtime picks Compute only when the driver lists
+    it (logged: "video: OpenGL ES 3.2, N extensions, GL_EXT_shader_implicit_conversions yes/no"), else falls back to
+    the OpenGL renderer and the menu says so. Patched GPU3D_Compute.cpp + GPU3D_Compute_shaders.h in melonds_patched
+    (ES header; three ambiguous min() made uint). tools/check_gles_compute.py: all 33 variants compile as GLSL ES 3.20
+    with glslc at 2x-8x. gles_compat loads glDispatchCompute(Indirect), glMemoryBarrier, glBindImageTexture,
+    glTexBuffer, glDebugMessageCallback, glDeleteSamplers. Phone compute capped at 4x (tile memory).
+    If the Pixel lacks the extension: the 162 lines need explicit uint casts (the checker without the #extension
+    line lists them).

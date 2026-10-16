@@ -136,7 +136,7 @@ public final class DsPad extends View {
     boolean stickMode() { return stickMode; }
 
     /** Widescreen: the picture is 342 DS pixels across, not 256 (frontend main.cpp kWideExtra), so the bars are narrower. */
-    void setWide(boolean on) {
+    void setWide(boolean on) {  // (the menu and GameActivity: off with the compute renderer, which has none)
         wide = on;
         invalidate();
     }

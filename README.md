@@ -66,9 +66,10 @@ and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melo
 
 - **Streaks in the 3D with the GPU renderer.** Walking around, some ground textures (rock borders, edges where
   surfaces overlap) smear into horizontal streaks, on the PC and on the phone, at every resolution, with or without
-  widescreen; the "3D fixes" settings do not change it. The software renderer is fine, so it lies in the GPU renderer
-  (melonDS's OpenGL renderer as this project uses it). The compute renderer (PC, in the menu) is the next thing to
-  compare. Until it is fixed, the software renderer gives the DS's exact picture.
+  widescreen. The **compute renderer** (Renderer: Compute in the menu) has none: on the PC it needs OpenGL 4.3; on a
+  phone it needs OpenGL ES 3.1 and a driver feature (`GL_EXT_shader_implicit_conversions`), and the menu says when
+  the phone lacks it. Compute goes up to 4x on a phone and has no widescreen or texture filtering yet. The software
+  renderer is fine too (the DS's exact picture).
 
 ## What you need
 

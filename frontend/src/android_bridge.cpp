@@ -66,6 +66,14 @@ extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetStick(JN
     ph::pad::stick_y.store(int(y * 1000.0f));
 }
 
+extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetCompute(JNIEnv*, jclass, jboolean on) {
+    ph::pad::compute.store(on != JNI_FALSE ? 1 : 0);
+}
+
+extern "C" JNIEXPORT jboolean JNICALL Java_com_phrecomp_ph_PhInput_nativeComputeFailed(JNIEnv*, jclass) {
+    return ph::pad::compute_failed.load() ? JNI_TRUE : JNI_FALSE;
+}
+
 extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetFixes(JNIEnv*, jclass, jint bits) {
     ph::pad::fixes.store(int(bits) & 3);
 }

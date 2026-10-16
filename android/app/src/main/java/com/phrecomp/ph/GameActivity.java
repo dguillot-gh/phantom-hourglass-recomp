@@ -39,7 +39,8 @@ public class GameActivity extends SDLActivity {
         final java.util.ArrayList<String> args = new java.util.ArrayList<>(java.util.Arrays.asList(
                 new File(files, "rom/azee.nds").getAbsolutePath(),
                 "--data-dir", files.getAbsolutePath(),
-                "--renderer", prefs.getBoolean("gpu", false) ? "gpu" : "software",
+                "--renderer", !prefs.getBoolean("gpu", false) ? "software"
+                              : prefs.getBoolean("compute", false) ? "compute" : "gpu",
                 "--scale", String.valueOf(Math.min(6, prefs.getInt("scale", 2)))));
         if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_CONTINUE, false)) args.add("--continue");
         if (prefs.getBoolean("wide", false)) args.add("--wide");
@@ -109,7 +110,7 @@ public class GameActivity extends SDLActivity {
         setFpsShown(prefs.getBoolean("fps", false));
         PhInput.nativeSetStretch(prefs.getBoolean("stretch", false));
         PhInput.nativeSetStickMode(pad.stickMode());
-        pad.setWide(prefs.getBoolean("wide", false) && prefs.getBoolean("gpu", false));
+        pad.setWide(prefs.getBoolean("wide", false) && prefs.getBoolean("gpu", false) && !prefs.getBoolean("compute", false));
         if (portrait()) pad.setScreen(PhInput.SCREEN_BOTH);
         hideSystemBars();
     }

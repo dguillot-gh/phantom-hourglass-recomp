@@ -943,6 +943,32 @@ void RuntimeImpl::apply_cpu_speed(int multiplier) {
     cpu.next_event = int64_t(n.ARM9Target);
 }
 
+// Whether the compute renderer can run: desktop OpenGL 4.3, or on the phone OpenGL ES 3.1+ with
+// GL_EXT_shader_implicit_conversions (its shaders' int-to-uint conversions, third_party/CMakeLists.txt). Logged once.
+static bool compute_available() {
+#ifdef __ANDROID__
+    static int ok = -1;
+    if (ok < 0) {
+        GLint major = 0, minor = 0, count = 0;
+        glGetIntegerv(GL_MAJOR_VERSION, &major);
+        glGetIntegerv(GL_MINOR_VERSION, &minor);
+        glGetIntegerv(GL_NUM_EXTENSIONS, &count);
+        bool conversions = false;
+        for (GLint i = 0; i < count && glGetStringi; i++) {
+            const char* e = reinterpret_cast<const char*>(glGetStringi(GL_EXTENSIONS, GLuint(i)));
+            if (e && std::strcmp(e, "GL_EXT_shader_implicit_conversions") == 0) conversions = true;
+        }
+        const bool es31 = major > 3 || (major == 3 && minor >= 1);
+        ok = es31 && conversions && glDispatchCompute && glBindImageTexture && glMemoryBarrier && glTexBuffer;
+        log("video: OpenGL ES %d.%d, %d extensions, GL_EXT_shader_implicit_conversions %s: the compute renderer is %s\n",
+            int(major), int(minor), int(count), conversions ? "yes" : "no", ok ? "available" : "not available");
+    }
+    return ok != 0;
+#else
+    return GLAD_GL_VERSION_4_3 != 0;
+#endif
+}
+
 // Switches melonDS's renderer (between frames). Falls back to OpenGL when the context lacks compute shaders, and to
 // Software when there is no usable context at all.
 void RuntimeImpl::apply_video(VideoSettings s) {
@@ -952,8 +978,8 @@ void RuntimeImpl::apply_video(VideoSettings s) {
         log("video: no OpenGL context, using the software renderer\n");
         s.renderer = Renderer::Software;
     }
-    if (s.renderer == Renderer::Compute && !GLAD_GL_VERSION_4_3) {
-        log("video: OpenGL 4.3 is not available for the compute renderer, using OpenGL\n");
+    if (s.renderer == Renderer::Compute && !compute_available()) {
+        log("video: the compute renderer cannot run here (OpenGL 4.3, or ES 3.1 with implicit conversions), using OpenGL\n");
         s.renderer = Renderer::OpenGL;
     }
     // (The widescreen picture is made by the OpenGL and compute renderers only.)

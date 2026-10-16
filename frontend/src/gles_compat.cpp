@@ -87,6 +87,7 @@ void* APIENTRY map_buffer(GLenum target, GLenum access) {
 }
 // (The fragment outputs have their locations in the ES shaders: third_party/gles_shaders.cmake.)
 void APIENTRY bind_frag_data_location(GLuint, GLuint, const GLchar*) {}
+void APIENTRY debug_message_callback(GLDEBUGPROC, const void*) {}  // (a driver without KHR_debug in core)
 
 template <class F>
 void load(F& fn, const char* name) {
@@ -108,6 +109,15 @@ bool install_gles_compat() {
     load(glad_glGenSamplers, "glGenSamplers");
     load(glad_glBindSampler, "glBindSampler");
     load(glad_glSamplerParameteri, "glSamplerParameteri");
+    load(glad_glDeleteSamplers, "glDeleteSamplers");
+    // (The compute renderer, ES 3.1 / 3.2; without them the runtime keeps to the OpenGL one.)
+    load(glad_glDispatchCompute, "glDispatchCompute");
+    load(glad_glDispatchComputeIndirect, "glDispatchComputeIndirect");
+    load(glad_glMemoryBarrier, "glMemoryBarrier");
+    load(glad_glBindImageTexture, "glBindImageTexture");
+    load(glad_glTexBuffer, "glTexBuffer");
+    load(glad_glDebugMessageCallback, "glDebugMessageCallback");
+    if (!glad_glDebugMessageCallback) glad_glDebugMessageCallback = debug_message_callback;
     if (!glad_glGenSamplers || !glad_glBindSampler || !glad_glSamplerParameteri ||!es_clear_depthf || !es_depth_rangef || !glad_glTexStorage3D || !glad_glDrawBuffers || !glad_glMapBufferRange ||
         !glad_glFramebufferTexture || !glad_glColorMaski) {
         std::fprintf(stderr, "video: this OpenGL ES lacks functions the GPU renderer needs\n");

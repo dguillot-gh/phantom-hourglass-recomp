@@ -79,6 +79,8 @@ std::atomic<int> stick_mode{-1};
 std::atomic<int> wide{-1};
 std::atomic<int> textures{-1};
 std::atomic<int> fixes{-1};
+std::atomic<int> compute{-1};
+std::atomic<bool> compute_failed{false};
 std::atomic<bool> resume_done{false};
 }  // namespace ph::pad
 
@@ -212,6 +214,9 @@ ntr::VideoSettings video_for(const Settings& s) {
     ntr::VideoSettings v;
     v.renderer = !s.gpu ? ntr::Renderer::Software : s.compute ? ntr::Renderer::Compute : ntr::Renderer::OpenGL;
     v.scale = s.gpu ? s.scale : 1;
+#ifdef __ANDROID__
+    if (s.compute) v.scale = std::min(v.scale, 4);  // (its tile memory at 6x: some 300 MB of a phone's graphics memory)
+#endif
     v.wide_extra = s.gpu && s.wide ? kWideExtra : 0;  // (the game's projection follows: ph::set_wide_extra)
     v.hud_edges = v.wide_extra > 0;  // the HUD at the wide picture's edges (touches on it are mapped back: to_ds)
     v.hud_sides = v.hud_edges;       // (the rupee count with its icon, the menu bar with the Menu button)
@@ -327,6 +332,7 @@ struct Shared {
     int menu_page = 0;
     bool video_dirty = false;
     std::atomic<bool> gpu_failed{false};  // the GPU renderer could not start
+    std::atomic<bool> compute_failed{false};  // the compute renderer was asked for and cannot run (the OpenGL one does)
     std::atomic<int> gl_display{0};       // 1: the game thread draws with OpenGL; -1: it cannot (phone fallback)
     std::atomic<bool> shot_request{false};
     fs::path shot_dir;
@@ -577,6 +583,8 @@ private:
         // between frames, so until a couple of frames after a change it still reports the renderer it had.)
         if (view.gpu && rt_->video().renderer == ntr::Renderer::Software && frames_ > video_asked_ + 2)
             s_.gpu_failed = true;
+        if (frames_ > video_asked_ + 2)
+            s_.compute_failed = view.gpu && view.compute && rt_->video().renderer == ntr::Renderer::OpenGL;
 
         int w = 0, h = 0;
         SDL_GetWindowSizeInPixels(window_, &w, &h);
@@ -914,9 +922,6 @@ int main(int argc, char** argv) {
     if (renderer_arg == "gpu") settings.gpu = true, settings.compute = false;
     else if (renderer_arg == "compute") settings.gpu = settings.compute = true;
     else if (renderer_arg == "software") settings.gpu = false;
-#ifdef __ANDROID__
-    settings.compute = false;  // (OpenGL 4.3 only)
-#endif
     if (std::find(std::begin(kScales), std::end(kScales), scale_arg) != std::end(kScales)) settings.scale = scale_arg;
 #ifdef __ANDROID__
     settings.layout = Layout::Bottom;  // (on the phone the on-screen pad chooses the screens: it starts on the touch screen)
@@ -1211,6 +1216,9 @@ int main(int argc, char** argv) {
             settings.textures = want, changed = video = true;
         if (const int want = ph::pad::fixes.exchange(-1); want >= 0 && want <= 3 && want != settings.fixes)
             settings.fixes = want, changed = video = true;
+        if (const int want = ph::pad::compute.exchange(-1); want >= 0 && (want != 0) != settings.compute)
+            settings.compute = want != 0, changed = video = true;
+        ph::pad::compute_failed = shared.compute_failed.load();
         if (const int want = ph::pad::video.exchange(-1); want >= 0) {  // (gpu << 8) | scale
             settings.gpu = (want >> 8) != 0;
             if (std::find(std::begin(kScales), std::end(kScales), want & 0xFF) != std::end(kScales)) settings.scale = want & 0xFF;

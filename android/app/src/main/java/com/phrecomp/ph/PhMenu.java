@@ -144,12 +144,19 @@ final class PhMenu {
         final int scale = Math.min(6, prefs.getInt("scale", 2));
         list.addView(label("Renderer", failed ? "The GPU renderer could not start on this phone: software only."
                 : "GPU draws the game sharper at a higher resolution (uses more battery); Software is the DS's own picture."));
-        chips(list, new String[] {"Software", "GPU"}, gpu ? 1 : 0, i -> {
-            prefs.edit().putBoolean("gpu", i == 1).apply();
-            PhInput.nativeSetVideo(i == 1, prefs.getInt("scale", 2));
+        final boolean compute = gpu && prefs.getBoolean("compute", false);
+        chips(list, new String[] {"Software", "GPU", "Compute"}, !gpu ? 0 : compute ? 2 : 1, i -> {
+            prefs.edit().putBoolean("gpu", i >= 1).putBoolean("compute", i == 2).apply();
+            PhInput.nativeSetCompute(i == 2);
+            PhInput.nativeSetVideo(i >= 1, prefs.getInt("scale", 2));
             pad.setWide(i == 1 && prefs.getBoolean("wide", false));
             refresh();
-        }, new boolean[] {true, !failed});
+        }, new boolean[] {true, !failed, !failed});
+        if (compute) {
+            list.addView(label("", PhInput.nativeComputeFailed()
+                    ? "Compute cannot run on this phone (its graphics driver lacks a feature it needs): the GPU renderer draws."
+                    : "Compute: the most accurate 3D (no streaks), up to 4×; no widescreen or texture filtering."));
+        }
         list.addView(label("Internal resolution", gpu ? "How many times the DS's resolution the GPU renderer draws at."
                 : "With the GPU renderer."));
         // (Up to 6×: at 8× the renderer's buffers ran a Pixel 8 out of graphics memory.)

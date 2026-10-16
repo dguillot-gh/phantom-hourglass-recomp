@@ -49,6 +49,12 @@ public final class PhInput {
     /** The GPU renderer could not start on this phone (the game is on the software one). */
     public static native boolean nativeGpuFailed();
 
+    /** The compute renderer (with the GPU one on): more accurate 3D, no streaks; needs OpenGL ES 3.1 and the driver's
+     *  GL_EXT_shader_implicit_conversions, else the OpenGL renderer draws (nativeComputeFailed). */
+    public static native void nativeSetCompute(boolean on);
+
+    public static native boolean nativeComputeFailed();
+
     /** 3D fixes, bits: 1 fewer seams between polygons (GPU renderer), 2 stable textures (no smearing as the view moves). */
     public static native void nativeSetFixes(int bits);
 
