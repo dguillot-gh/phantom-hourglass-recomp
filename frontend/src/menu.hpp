@@ -35,6 +35,7 @@ struct MenuState {
     bool stick = false;        // a gamepad's left stick moves Link as an analog stick (else it is the D-pad)
     bool wide = false;         // widescreen 16:9 (a test; the GPU renderer only)
     int textures = 0;          // the 3D's textures (GPU renderer): 0 the DS's pixels, 1 smooth, 2 sharp
+    int fixes = 0;             // 3D fixes, bits: 1 fewer seams (GPU renderer), 2 stable textures
 };
 
 enum class MenuResult { None, Changed, Quit, SaveState, LoadState, Continue };

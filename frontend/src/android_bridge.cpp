@@ -66,6 +66,10 @@ extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetStick(JN
     ph::pad::stick_y.store(int(y * 1000.0f));
 }
 
+extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetFixes(JNIEnv*, jclass, jint bits) {
+    ph::pad::fixes.store(int(bits) & 3);
+}
+
 extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetTextures(JNIEnv*, jclass, jint mode) {
     ph::pad::textures.store(int(mode));
 }

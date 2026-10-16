@@ -46,6 +46,8 @@ public class GameActivity extends SDLActivity {
         final String[] textures = {"pixels", "smooth", "sharp"};
         args.add("--textures");
         args.add(textures[Math.max(0, Math.min(2, prefs.getInt("textures", 0)))]);
+        args.add("--fixes");
+        args.add(String.valueOf(prefs.getInt("fixes", 0) & 3));
         return args.toArray(new String[0]);
     }
 

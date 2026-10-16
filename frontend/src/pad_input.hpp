@@ -25,5 +25,6 @@ extern std::atomic<int> stick_x, stick_y;  // the on-screen analog stick, -1000.
 extern std::atomic<int> stick_mode;        // the analog stick moves Link (1) or the D-pad does (0); -1: no change
 extern std::atomic<int> wide;              // widescreen asked for (1 on, 0 off); -1: no change
 extern std::atomic<int> textures;          // the 3D textures asked for (0 pixels, 1 smooth, 2 sharp); -1: no change
+extern std::atomic<int> fixes;             // the 3D fixes asked for (bits: 1 fewer seams, 2 stable textures); -1: no change
 
 }  // namespace ph::pad

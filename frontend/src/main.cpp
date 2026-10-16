@@ -17,6 +17,7 @@
 //   PhantomHourglass.exe <rom.nds> [--save-file F] [--data-dir D] [--input-script S] [--exit-after-frames N]
 //                        [--fullscreen] [--unpaced] [--module M] [--read-only-save] [--renderer software|gpu]
 //                        [--scale 2|4|6|8] [--continue] [--wide] [--textures pixels|smooth|sharp]
+//                        [--fixes 0-3]
 #include <SDL3/SDL.h>
 #ifdef __ANDROID__
 #include <SDL3/SDL_main.h>  // (SDL's Android activity calls SDL_main in libmain.so)
@@ -77,6 +78,7 @@ std::atomic<int> stick_x{0}, stick_y{0};
 std::atomic<int> stick_mode{-1};
 std::atomic<int> wide{-1};
 std::atomic<int> textures{-1};
+std::atomic<int> fixes{-1};
 std::atomic<bool> resume_done{false};
 }  // namespace ph::pad
 
@@ -156,6 +158,7 @@ struct Settings {
     bool stick = false;   // the analog stick moves Link (a gamepad's left stick, the phone's on-screen stick)
     bool wide = false;    // widescreen, 16:9 (a test; the GPU renderer only)
     int textures = 0;     // the 3D's textures with the GPU renderer: 0 the DS's pixels, 1 smooth, 2 sharp
+    int fixes = 0;        // 3D fixes, bits: 1 fewer seams (GPU renderer's better polygons), 2 stable textures (no warp)
 };
 
 Settings load_settings(const fs::path& p) {
@@ -178,6 +181,7 @@ Settings load_settings(const fs::path& p) {
         else if (k == "stick") s.stick = v == "1";
         else if (k == "wide") s.wide = v == "1";
         else if (k == "textures") s.textures = std::clamp(std::atoi(v.c_str()), 0, 2);
+        else if (k == "fixes") s.fixes = std::clamp(std::atoi(v.c_str()), 0, 3);
     }
     if (std::find(std::begin(kScales), std::end(kScales), s.scale) == std::end(kScales)) s.scale = 4;
     return s;
@@ -200,6 +204,7 @@ void save_settings(const fs::path& p, const Settings& s) {
     f << "stick=" << (s.stick ? 1 : 0) << "\n";
     f << "wide=" << (s.wide ? 1 : 0) << "\n";
     f << "textures=" << s.textures << "\n";
+    f << "fixes=" << s.fixes << "\n";
 }
 
 ntr::VideoSettings video_for(const Settings& s) {
@@ -211,6 +216,8 @@ ntr::VideoSettings video_for(const Settings& s) {
     v.hud_sides = v.hud_edges;       // (the rupee count with its icon, the menu bar with the Menu button)
     v.texture_smoothing = s.textures == 1 ? ntr::TextureSmoothing::Smooth
                           : s.textures == 2 ? ntr::TextureSmoothing::Sharp : ntr::TextureSmoothing::Off;
+    v.better_polygons = (s.fixes & 1) != 0;  // (seams between polygons in upscaled 3D)
+    v.stable_textures = (s.fixes & 2) != 0;  // (textures the DS bends with the view, smeared)
     return v;
 }
 
@@ -646,6 +653,7 @@ private:
             ms.stick = view.stick;
             ms.wide = view.wide;
             ms.textures = view.textures;
+            ms.fixes = view.fixes;
             const int layer = view.layout == Layout::Top ? 0 : 1;  // the screen the player looks at
             menu.draw(*gl_, ms, float(w), float(h), ui, float(ph::pad::game_fps10.load()) / 10.0f,
                       [&](int slot, const ph::Rect& r) { gl_->thumbnail(slot, layer, r); });
@@ -833,7 +841,7 @@ int main(int argc, char** argv) {
     uint64_t exit_after = 0;
     bool fullscreen_arg = false, unpaced = false, read_only_save = false, continue_arg = false, wide_arg = false;
     std::string renderer_arg, textures_arg;
-    int scale_arg = 0;
+    int scale_arg = 0, fixes_arg = -1;
     for (int i = 1; i < argc; i++) {
         const std::string a = argv[i];
         const bool has = i + 1 < argc;
@@ -850,6 +858,7 @@ int main(int argc, char** argv) {
         else if (a == "--continue") continue_arg = true;
         else if (a == "--wide") wide_arg = true;
         else if (a == "--textures" && has) textures_arg = argv[++i];
+        else if (a == "--fixes" && has) fixes_arg = std::atoi(argv[++i]);
         else if (a == "--no-settings") {}  // (accepted: tests never write settings anyway, see below)
         else if (!a.empty() && a[0] != '-' && rom_path.empty()) rom_path = a;
         else {
@@ -899,6 +908,7 @@ int main(int argc, char** argv) {
     if (textures_arg == "pixels") settings.textures = 0;
     else if (textures_arg == "smooth") settings.textures = 1;
     else if (textures_arg == "sharp") settings.textures = 2;
+    if (fixes_arg >= 0 && fixes_arg <= 3) settings.fixes = fixes_arg;
     if (renderer_arg == "gpu") settings.gpu = true;
     else if (renderer_arg == "software") settings.gpu = false;
     if (std::find(std::begin(kScales), std::end(kScales), scale_arg) != std::end(kScales)) settings.scale = scale_arg;
@@ -1026,11 +1036,12 @@ int main(int argc, char** argv) {
         ms.stick = settings.stick;
         ms.wide = settings.wide;
         ms.textures = settings.textures;
+        ms.fixes = settings.fixes;
         return ms;
     };
     auto menu_done = [&](const ph::MenuState& ms, ph::MenuResult r) {
         const bool video = ms.gpu != settings.gpu || ms.scale != settings.scale || ms.wide != settings.wide ||
-                           ms.textures != settings.textures;
+                           ms.textures != settings.textures || ms.fixes != settings.fixes;
         if (r == ph::MenuResult::Quit) request_quit();
         settings.layout = ms.layout, settings.gpu = ms.gpu, settings.scale = ms.scale;
         settings.smooth = ms.smooth, settings.fps = ms.fps, settings.slot = ms.slot;
@@ -1038,6 +1049,7 @@ int main(int argc, char** argv) {
         settings.stick = ms.stick;
         settings.wide = ms.wide;
         settings.textures = ms.textures;
+        settings.fixes = ms.fixes;
         if (ms.fullscreen != settings.fullscreen) set_fullscreen(ms.fullscreen);
         ph::pad::fps = settings.fps;
         ph::pad::fps_corner = settings.fps_corner;
@@ -1188,6 +1200,8 @@ int main(int argc, char** argv) {
             settings.wide = want != 0, changed = video = true;
         if (const int want = ph::pad::textures.exchange(-1); want >= 0 && want <= 2 && want != settings.textures)
             settings.textures = want, changed = video = true;
+        if (const int want = ph::pad::fixes.exchange(-1); want >= 0 && want <= 3 && want != settings.fixes)
+            settings.fixes = want, changed = video = true;
         if (const int want = ph::pad::video.exchange(-1); want >= 0) {  // (gpu << 8) | scale
             settings.gpu = (want >> 8) != 0;
             if (std::find(std::begin(kScales), std::end(kScales), want & 0xFF) != std::end(kScales)) settings.scale = want & 0xFF;

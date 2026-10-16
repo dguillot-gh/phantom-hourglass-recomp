@@ -170,6 +170,14 @@ final class PhMenu {
             PhInput.nativeSetTextures(i);
             refresh();
         }, new boolean[] {true, gpu, gpu});
+        list.addView(label("3D fixes", "Seams: no thin lines between polygons (GPU renderer). Warp: textures stay put "
+                + "instead of smearing as the view moves."));
+        final int fixes = prefs.getInt("fixes", 0) & 3;
+        chips(list, new String[] {"Off", "Seams", "Warp", "Both"}, gpu ? fixes : fixes & 2, i -> {
+            prefs.edit().putInt("fixes", i).apply();
+            PhInput.nativeSetFixes(i);
+            refresh();
+        }, new boolean[] {true, gpu, true, gpu});
 
         states(list);
 

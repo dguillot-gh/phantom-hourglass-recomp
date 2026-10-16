@@ -49,6 +49,9 @@ public final class PhInput {
     /** The GPU renderer could not start on this phone (the game is on the software one). */
     public static native boolean nativeGpuFailed();
 
+    /** 3D fixes, bits: 1 fewer seams between polygons (GPU renderer), 2 stable textures (no smearing as the view moves). */
+    public static native void nativeSetFixes(int bits);
+
     /** The 3D's textures with the GPU renderer: 0 the DS's pixels, 1 smooth, 2 sharp (crisp, soft only between texels). */
     public static native void nativeSetTextures(int mode);
 
