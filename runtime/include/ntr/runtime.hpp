@@ -74,6 +74,13 @@ struct Frame {
     // shows engine A (the 3D one), layer `wide_layer`, fills it; the other screen's 256 pixels are in the middle.
     int wide_extra = 0;
     int wide_layer = 0;
+    // VideoSettings::hud_edges: the HUD's sprite clusters moved out to the wide picture's edges (DS pixels before the
+    // move, and how far they moved): a touch on one belongs to the DS pixel it covers before the move.
+    struct HudMove {
+        int x0, y0, x1, y1, dx;
+    };
+    int hud_moves = 0;
+    HudMove hud_move[16]{};
     // Measurements of the emulation up to this frame (testing, see docs/TESTING.md).
     double emu_ms = 0;               // host time spent emulating this frame (not the frontend's pacing or presenting)
     uint64_t interp_steps = 0;       // instructions the interpreter ran for the frames' functions this frame

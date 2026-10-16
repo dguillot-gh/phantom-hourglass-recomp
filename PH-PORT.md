@@ -78,8 +78,13 @@ shares the config with the clean dump (sha1 4c8f52dd...). melonDS's ROM list giv
     function the five r2 = 0x1555 call sites reach, using the hardware divider at 0x04000290), which swaps the 4:3
     aspect for the wide one and sets ffcc_wide_scene. Frame::wide_layer (engine A's screen, POWCNT1 bit 15) tells
     the frontend which screen is wide (in PH usually the touch screen); touches beside the DS's 256 pixels go to the
-    nearest edge. HUD edges off: the HUD stays in the middle 4:3, so taps on it line up. Expect objects to appear
-    late at the sides (the game culls to its 4:3 view) and some rooms to show past their walls.
+    nearest edge. Expect objects to appear late at the sides (the game culls to its 4:3 view) and some rooms to show
+    past their walls.
+  - 2026-10-16 home test: 16:9 worked, the stick "worked amazing"; the HUD (hearts, Menu) stayed in the middle 4:3.
+    Now HUD edges are on with widescreen: the sprite pass records each cluster it moves (FfccHudMoved, a ph patch in
+    third_party/CMakeLists.txt), Frame::hud_move carries them, and ph::to_ds maps a touch on a moved cluster back to
+    the DS pixel the game expects. Only sprite clusters touching the left/right edge move; HUD drawn as background
+    layers would stay in the middle.
 
 ## Next
 

@@ -19,6 +19,9 @@ extern int FfccWideExtra;
 // The HUD (engine A's sprite clusters at the screen's side edges): moved to the edges of the wide picture when
 // FfccHudEdges, and scaled by FfccHudScale percent about the screen's corner.
 extern int FfccHudEdges, FfccHudScale;
+// GPU2D_OpenGL.cpp: the HUD clusters it moved this frame (x0, y0, x1, y1 in DS pixels before the move, x offset).
+extern int FfccHudMoved[16][5];
+extern int FfccHudMovedCount;
 // Stable texture mapping: quads with texture coordinates no perspective transform fits are cut into a grid.
 extern int FfccStableUV;
 // GPU3D_OpenGL.cpp: texture smoothing in the 3D shader (0 off, 1 smooth, 2 sharp).

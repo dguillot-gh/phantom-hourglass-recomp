@@ -203,6 +203,7 @@ ntr::VideoSettings video_for(const Settings& s) {
     v.renderer = s.gpu ? ntr::Renderer::OpenGL : ntr::Renderer::Software;
     v.scale = s.gpu ? s.scale : 1;
     v.wide_extra = s.gpu && s.wide ? kWideExtra : 0;  // (the game's projection follows: ph::set_wide_extra)
+    v.hud_edges = v.wide_extra > 0;  // the HUD at the wide picture's edges (touches on it are mapped back: to_ds)
     return v;
 }
 
@@ -291,6 +292,9 @@ struct Shared {
     std::atomic<int> stick_x{0}, stick_y{0};  // where it is, -1000..1000 (y down)
     // Widescreen as drawn: the extra pixels each side of the wide screen (0: none), and its layer (0 top, 1 bottom).
     std::atomic<int> wide_extra{0}, wide_layer{1};
+    std::mutex hud_mutex;  // the HUD clusters moved to the edges in the frame shown (ph::to_ds)
+    std::array<ph::HudMove, 16> hud{};
+    int hud_count = 0;
     std::atomic<bool> quit{false};
     std::atomic<bool> paused{false};  // the app is in the background (Android): the game waits
     std::atomic<bool> resume_done{false};  // the resume state asked for at quit / going to the background is written (or failed)
@@ -565,6 +569,14 @@ private:
         const int extra = view.wide ? frame.wide_extra : 0;  // (0 until the renderer has made the change)
         s_.wide_extra = extra;
         s_.wide_layer = frame.wide_layer;
+        {
+            std::lock_guard<std::mutex> lock(s_.hud_mutex);
+            s_.hud_count = extra ? frame.hud_moves : 0;
+            for (int i = 0; i < s_.hud_count; i++) {
+                const auto& m = frame.hud_move[i];
+                s_.hud[size_t(i)] = {m.x0, m.y0, m.x1, m.y1, m.dx};
+            }
+        }
         const ph::Views v = ph::compute_views(float(w), float(h), view.layout, view.stretch, extra, frame.wide_layer);
         if (v.top_shown) gl_->screen(frame, 0, v.top, view.smooth, extra > 0);
         if (v.bottom_shown) gl_->screen(frame, 1, v.bottom, view.smooth, extra > 0);
@@ -1187,7 +1199,14 @@ int main(int argc, char** argv) {
         if (down && views.bottom_shown && views.bottom.contains(mx, my) && views.bottom.w > 0) {
             touching = true;
             int tx = 0, ty = 0;
-            ph::to_ds(views.bottom, wide_layer == 1 ? wide_extra : 0, mx, my, tx, ty);
+            std::array<ph::HudMove, 16> hud{};
+            int hud_count = 0;
+            if (wide_layer == 1 && wide_extra) {
+                std::lock_guard<std::mutex> lock(shared.hud_mutex);
+                hud = shared.hud;
+                hud_count = shared.hud_count;
+            }
+            ph::to_ds(views.bottom, wide_layer == 1 ? wide_extra : 0, mx, my, tx, ty, hud.data(), hud_count);
             shared.touch_x = tx;
             shared.touch_y = ty;
         }

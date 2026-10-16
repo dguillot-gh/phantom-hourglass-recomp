@@ -62,12 +62,27 @@ inline Views compute_views(float win_w, float win_h, Layout layout, bool stretch
     return v;
 }
 
+// A HUD cluster the renderer moved out to the wide picture's edge: its DS pixels before the move, and how far.
+struct HudMove {
+    int x0, y0, x1, y1, dx;
+};
+
 // A point in a shown screen `r` to the DS's pixel: with `extra` wide pixels on each side, the DS's 256 are the
-// middle ones (a point beside them goes to the nearest edge).
-inline void to_ds(const Rect& r, int extra, float px, float py, int& x, int& y) {
+// middle ones (a point beside them goes to the nearest edge). A point on a moved HUD cluster goes to the pixel the
+// cluster covers on the DS, where the game looks for the touch.
+inline void to_ds(const Rect& r, int extra, float px, float py, int& x, int& y, const HudMove* moves = nullptr,
+                  int count = 0) {
     const float total = 256.0f + 2.0f * float(extra);
-    x = std::clamp(int((px - r.x) / r.w * total) - extra, 0, 255);
+    int wx = int((px - r.x) / r.w * total) - extra;
     y = std::clamp(int((py - r.y) / r.h * 192.0f), 0, 191);
+    for (int i = 0; i < count; i++) {
+        const HudMove& m = moves[i];
+        if (y >= m.y0 && y < m.y1 && wx - m.dx >= m.x0 && wx - m.dx < m.x1) {
+            wx -= m.dx;
+            break;
+        }
+    }
+    x = std::clamp(wx, 0, 255);
 }
 
 }  // namespace ph
