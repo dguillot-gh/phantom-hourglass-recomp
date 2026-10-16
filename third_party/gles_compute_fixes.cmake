@@ -219,3 +219,23 @@ gles_compute_fix("        if (BinPolygon(Polygons[polygonIdx], fineTileTopLeft, 
 # anyway; a tile-based phone GPU need not (the 3D came out in scrambled tiles on the Pixel 8).
 gles_compute_fix("    barrier();\n"
   "    memoryBarrierShared();\n    barrier();\n")
+
+# The work counters (per variant x, y = 1 and z = its work count for the indirect dispatch, w used as a counter by
+# variants 0 and 1) were uvec4s, counted with atomicAdd on one component (VariantWorkCount[i].z). GLSL ES allows atomics
+# on a buffer's integer variables and array elements; on the Pixel 8 the counts came out wrong (tiles drew each other's
+# work: the 3D in scrambled tiles at every scale). As a flat uint array (the same memory: the host's BinResultHeader
+# already declares it u32[MaxVariants*4]) every atomic is on a plain element.
+gles_compute_fix("    uvec4 VariantWorkCount[MaxVariants];"
+  "    uint VariantWorkCount[MaxVariants*4]; // ph patch: [variant*4 + 0..3], the atomics on plain elements")
+gles_compute_fix("    VariantWorkCount[gl_GlobalInvocationID.x] = uvec4(1, 1, 0, 0);"
+  "    uint at = gl_GlobalInvocationID.x * 4U;\n    VariantWorkCount[at] = 1U;\n    VariantWorkCount[at + 1U] = 1U;\n    VariantWorkCount[at + 2U] = 0U;\n    VariantWorkCount[at + 3U] = 0U;")
+gles_compute_fix("atomicAdd(VariantWorkCount[0].w, uint(bitCount(binnedMask)))"
+  "atomicAdd(VariantWorkCount[3], uint(bitCount(binnedMask)))")
+gles_compute_fix("atomicAdd(VariantWorkCount[variantIdx].z, 1U)"
+  "atomicAdd(VariantWorkCount[variantIdx * 4 + 2], 1U)")
+gles_compute_fix("uvec4((VariantWorkCount[0].w + 31U) / 32U, 1, 1, 0)"
+  "uvec4((VariantWorkCount[3] + 31U) / 32U, 1, 1, 0)")
+gles_compute_fix("atomicAdd(VariantWorkCount[1].w, VariantWorkCount[gl_GlobalInvocationID.x].z)"
+  "atomicAdd(VariantWorkCount[7], VariantWorkCount[gl_GlobalInvocationID.x * 4U + 2U])")
+gles_compute_fix("if (gl_GlobalInvocationID.x < VariantWorkCount[0].w)"
+  "if (gl_GlobalInvocationID.x < VariantWorkCount[3])")
