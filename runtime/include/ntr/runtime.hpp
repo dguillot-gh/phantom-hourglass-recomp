@@ -82,7 +82,7 @@ struct Frame {
         int x0, y0, x1, y1, dx;
     };
     int hud_moves = 0;
-    HudMove hud_move[16]{};
+    HudMove hud_move[32]{};
     // Measurements of the emulation up to this frame (testing, see docs/TESTING.md).
     double emu_ms = 0;               // host time spent emulating this frame (not the frontend's pacing or presenting)
     uint64_t interp_steps = 0;       // instructions the interpreter ran for the frames' functions this frame

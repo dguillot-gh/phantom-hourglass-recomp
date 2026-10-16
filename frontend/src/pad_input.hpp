@@ -24,5 +24,6 @@ extern std::atomic<bool> resume_done;     // the resume state asked for is writt
 extern std::atomic<int> stick_x, stick_y;  // the on-screen analog stick, -1000..1000 (y down); 0, 0 at rest
 extern std::atomic<int> stick_mode;        // the analog stick moves Link (1) or the D-pad does (0); -1: no change
 extern std::atomic<int> wide;              // widescreen asked for (1 on, 0 off); -1: no change
+extern std::atomic<int> textures;          // the 3D textures asked for (0 pixels, 1 smooth, 2 sharp); -1: no change
 
 }  // namespace ph::pad

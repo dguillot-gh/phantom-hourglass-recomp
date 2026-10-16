@@ -20,7 +20,7 @@ extern int FfccWideExtra;
 // FfccHudEdges, and scaled by FfccHudScale percent about the screen's corner.
 extern int FfccHudEdges, FfccHudScale;
 // GPU2D_OpenGL.cpp: the HUD clusters it moved this frame (x0, y0, x1, y1 in DS pixels before the move, x offset).
-extern int FfccHudMoved[16][5];
+extern int FfccHudMoved[32][5];
 extern int FfccHudMovedCount;
 // The HUD's clusters go to their side in the top and bottom bands, the bottom bar stays at the left (Phantom Hourglass).
 extern int FfccHudSides;

@@ -16,7 +16,7 @@
 //
 //   PhantomHourglass.exe <rom.nds> [--save-file F] [--data-dir D] [--input-script S] [--exit-after-frames N]
 //                        [--fullscreen] [--unpaced] [--module M] [--read-only-save] [--renderer software|gpu]
-//                        [--scale 2|4|6|8] [--continue] [--wide]
+//                        [--scale 2|4|6|8] [--continue] [--wide] [--textures pixels|smooth|sharp]
 #include <SDL3/SDL.h>
 #ifdef __ANDROID__
 #include <SDL3/SDL_main.h>  // (SDL's Android activity calls SDL_main in libmain.so)
@@ -76,6 +76,7 @@ std::atomic<bool> resume_request{false};
 std::atomic<int> stick_x{0}, stick_y{0};
 std::atomic<int> stick_mode{-1};
 std::atomic<int> wide{-1};
+std::atomic<int> textures{-1};
 std::atomic<bool> resume_done{false};
 }  // namespace ph::pad
 
@@ -154,6 +155,7 @@ struct Settings {
     bool stretch = false; // the picture stretched over the whole window (else the DS's shape, with bars)
     bool stick = false;   // the analog stick moves Link (a gamepad's left stick, the phone's on-screen stick)
     bool wide = false;    // widescreen, 16:9 (a test; the GPU renderer only)
+    int textures = 0;     // the 3D's textures with the GPU renderer: 0 the DS's pixels, 1 smooth, 2 sharp
 };
 
 Settings load_settings(const fs::path& p) {
@@ -175,6 +177,7 @@ Settings load_settings(const fs::path& p) {
         else if (k == "stretch") s.stretch = v == "1";
         else if (k == "stick") s.stick = v == "1";
         else if (k == "wide") s.wide = v == "1";
+        else if (k == "textures") s.textures = std::clamp(std::atoi(v.c_str()), 0, 2);
     }
     if (std::find(std::begin(kScales), std::end(kScales), s.scale) == std::end(kScales)) s.scale = 4;
     return s;
@@ -196,6 +199,7 @@ void save_settings(const fs::path& p, const Settings& s) {
     f << "stretch=" << (s.stretch ? 1 : 0) << "\n";
     f << "stick=" << (s.stick ? 1 : 0) << "\n";
     f << "wide=" << (s.wide ? 1 : 0) << "\n";
+    f << "textures=" << s.textures << "\n";
 }
 
 ntr::VideoSettings video_for(const Settings& s) {
@@ -205,6 +209,8 @@ ntr::VideoSettings video_for(const Settings& s) {
     v.wide_extra = s.gpu && s.wide ? kWideExtra : 0;  // (the game's projection follows: ph::set_wide_extra)
     v.hud_edges = v.wide_extra > 0;  // the HUD at the wide picture's edges (touches on it are mapped back: to_ds)
     v.hud_sides = v.hud_edges;       // (the rupee count with its icon, the menu bar with the Menu button)
+    v.texture_smoothing = s.textures == 1 ? ntr::TextureSmoothing::Smooth
+                          : s.textures == 2 ? ntr::TextureSmoothing::Sharp : ntr::TextureSmoothing::Off;
     return v;
 }
 
@@ -294,7 +300,7 @@ struct Shared {
     // Widescreen as drawn: the extra pixels each side of the wide screen (0: none), and its layer (0 top, 1 bottom).
     std::atomic<int> wide_extra{0}, wide_layer{1};
     std::mutex hud_mutex;  // the HUD clusters moved to the edges in the frame shown (ph::to_ds)
-    std::array<ph::HudMove, 16> hud{};
+    std::array<ph::HudMove, 32> hud{};
     int hud_count = 0;
     std::atomic<bool> quit{false};
     std::atomic<bool> paused{false};  // the app is in the background (Android): the game waits
@@ -639,6 +645,7 @@ private:
             ms.resume_time = resume_time_;
             ms.stick = view.stick;
             ms.wide = view.wide;
+            ms.textures = view.textures;
             const int layer = view.layout == Layout::Top ? 0 : 1;  // the screen the player looks at
             menu.draw(*gl_, ms, float(w), float(h), ui, float(ph::pad::game_fps10.load()) / 10.0f,
                       [&](int slot, const ph::Rect& r) { gl_->thumbnail(slot, layer, r); });
@@ -825,7 +832,7 @@ int main(int argc, char** argv) {
     fs::path rom_path, save_path, data_dir, script_path, module_path = ph::default_module_path();
     uint64_t exit_after = 0;
     bool fullscreen_arg = false, unpaced = false, read_only_save = false, continue_arg = false, wide_arg = false;
-    std::string renderer_arg;
+    std::string renderer_arg, textures_arg;
     int scale_arg = 0;
     for (int i = 1; i < argc; i++) {
         const std::string a = argv[i];
@@ -842,6 +849,7 @@ int main(int argc, char** argv) {
         else if (a == "--read-only-save") read_only_save = true;
         else if (a == "--continue") continue_arg = true;
         else if (a == "--wide") wide_arg = true;
+        else if (a == "--textures" && has) textures_arg = argv[++i];
         else if (a == "--no-settings") {}  // (accepted: tests never write settings anyway, see below)
         else if (!a.empty() && a[0] != '-' && rom_path.empty()) rom_path = a;
         else {
@@ -888,6 +896,9 @@ int main(int argc, char** argv) {
     Settings settings = testing ? Settings{} : load_settings(settings_path);
     if (fullscreen_arg) settings.fullscreen = true;
     if (wide_arg) settings.wide = true;
+    if (textures_arg == "pixels") settings.textures = 0;
+    else if (textures_arg == "smooth") settings.textures = 1;
+    else if (textures_arg == "sharp") settings.textures = 2;
     if (renderer_arg == "gpu") settings.gpu = true;
     else if (renderer_arg == "software") settings.gpu = false;
     if (std::find(std::begin(kScales), std::end(kScales), scale_arg) != std::end(kScales)) settings.scale = scale_arg;
@@ -1014,16 +1025,19 @@ int main(int argc, char** argv) {
         ms.resume_time = resume_time(shared.state_dir);
         ms.stick = settings.stick;
         ms.wide = settings.wide;
+        ms.textures = settings.textures;
         return ms;
     };
     auto menu_done = [&](const ph::MenuState& ms, ph::MenuResult r) {
-        const bool video = ms.gpu != settings.gpu || ms.scale != settings.scale || ms.wide != settings.wide;
+        const bool video = ms.gpu != settings.gpu || ms.scale != settings.scale || ms.wide != settings.wide ||
+                           ms.textures != settings.textures;
         if (r == ph::MenuResult::Quit) request_quit();
         settings.layout = ms.layout, settings.gpu = ms.gpu, settings.scale = ms.scale;
         settings.smooth = ms.smooth, settings.fps = ms.fps, settings.slot = ms.slot;
         settings.fps_corner = ms.fps_corner, settings.stretch = ms.stretch;
         settings.stick = ms.stick;
         settings.wide = ms.wide;
+        settings.textures = ms.textures;
         if (ms.fullscreen != settings.fullscreen) set_fullscreen(ms.fullscreen);
         ph::pad::fps = settings.fps;
         ph::pad::fps_corner = settings.fps_corner;
@@ -1172,6 +1186,8 @@ int main(int argc, char** argv) {
         bool video = false;
         if (const int want = ph::pad::wide.exchange(-1); want >= 0 && (want != 0) != settings.wide)
             settings.wide = want != 0, changed = video = true;
+        if (const int want = ph::pad::textures.exchange(-1); want >= 0 && want <= 2 && want != settings.textures)
+            settings.textures = want, changed = video = true;
         if (const int want = ph::pad::video.exchange(-1); want >= 0) {  // (gpu << 8) | scale
             settings.gpu = (want >> 8) != 0;
             if (std::find(std::begin(kScales), std::end(kScales), want & 0xFF) != std::end(kScales)) settings.scale = want & 0xFF;
@@ -1200,7 +1216,7 @@ int main(int argc, char** argv) {
         if (down && views.bottom_shown && views.bottom.contains(mx, my) && views.bottom.w > 0) {
             touching = true;
             int tx = 0, ty = 0;
-            std::array<ph::HudMove, 16> hud{};
+            std::array<ph::HudMove, 32> hud{};
             int hud_count = 0;
             if (wide_layer == 1 && wide_extra) {
                 std::lock_guard<std::mutex> lock(shared.hud_mutex);

@@ -49,6 +49,9 @@ public final class PhInput {
     /** The GPU renderer could not start on this phone (the game is on the software one). */
     public static native boolean nativeGpuFailed();
 
+    /** The 3D's textures with the GPU renderer: 0 the DS's pixels, 1 smooth, 2 sharp (crisp, soft only between texels). */
+    public static native void nativeSetTextures(int mode);
+
     /** Widescreen 16:9 (a test; the GPU renderer only): the 3D drawn wider, the HUD in the middle 4:3. */
     public static native void nativeSetWide(boolean on);
 

@@ -43,6 +43,9 @@ public class GameActivity extends SDLActivity {
                 "--scale", String.valueOf(Math.min(6, prefs.getInt("scale", 2)))));
         if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_CONTINUE, false)) args.add("--continue");
         if (prefs.getBoolean("wide", false)) args.add("--wide");
+        final String[] textures = {"pixels", "smooth", "sharp"};
+        args.add("--textures");
+        args.add(textures[Math.max(0, Math.min(2, prefs.getInt("textures", 0)))]);
         return args.toArray(new String[0]);
     }
 

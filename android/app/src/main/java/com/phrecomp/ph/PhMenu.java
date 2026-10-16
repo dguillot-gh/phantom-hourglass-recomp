@@ -147,6 +147,7 @@ final class PhMenu {
         chips(list, new String[] {"Software", "GPU"}, gpu ? 1 : 0, i -> {
             prefs.edit().putBoolean("gpu", i == 1).apply();
             PhInput.nativeSetVideo(i == 1, prefs.getInt("scale", 2));
+            pad.setWide(i == 1 && prefs.getBoolean("wide", false));
             refresh();
         }, new boolean[] {true, !failed});
         list.addView(label("Internal resolution", gpu ? "How many times the DS's resolution the GPU renderer draws at."
@@ -161,6 +162,14 @@ final class PhMenu {
             PhInput.nativeSetVideo(true, scales[i]);
             refresh();
         }, new boolean[] {!gpu, gpu, gpu, gpu});
+        list.addView(label("3D textures", gpu ? "Pixels keeps the DS's blocky texels; Smooth blends them; Sharp keeps "
+                + "them crisp with soft edges between." : "With the GPU renderer."));
+        final int textures = Math.max(0, Math.min(2, prefs.getInt("textures", 0)));
+        chips(list, new String[] {"Pixels", "Smooth", "Sharp"}, gpu ? textures : 0, i -> {
+            prefs.edit().putInt("textures", i).apply();
+            PhInput.nativeSetTextures(i);
+            refresh();
+        }, new boolean[] {true, gpu, gpu});
 
         states(list);
 
