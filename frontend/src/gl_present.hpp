@@ -56,6 +56,8 @@ private:
     std::string version_;
     static constexpr int kThumbLayers = 24;
     unsigned program_ = 0, vao_ = 0, vbo_ = 0, soft_tex_ = 0, font_tex_ = 0, read_fbo_ = 0, thumb_tex_ = 0;
+    mutable unsigned checked_frame_texture_ = 0;
+    mutable bool checked_frame_texture_valid_ = true;
     int u_view_ = -1, u_mode_ = -1, u_layer_ = -1, u_color_ = -1, u_tex_ = -1, u_font_ = -1;
     int u_swap_ = -1;
     int width_ = 1, height_ = 1;
