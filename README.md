@@ -27,9 +27,33 @@ and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melo
 - **The microphone and the lid** (the game asks you to blow out candles and to close the DS) are a key or a button.
 - An FPS counter, a side menu on both platforms, and the game's own saves kept as `.sav` files.
 
+## Pictures
+
 <p>
-  <img src="docs/images/phone-renderer-4x.png" width="256" alt="The title screen at 4x with the phone's renderer">
+  <img src="docs/images/pc-16x9-gpu.jpg" width="100%" alt="PC: a temple room in 16:9 with the GPU renderer at 8x">
 </p>
+<p><em>PC, GPU renderer at 8x, widescreen (16:9).</em></p>
+
+<p>
+  <img src="docs/images/pc-4x3-gpu.jpg" width="49%" alt="PC: the same room in 4:3 with the GPU renderer at 8x">
+  <img src="docs/images/pc-software.jpg" width="49%" alt="PC: the same room with the software renderer, the DS's own picture">
+</p>
+<p><em>The same room in 4:3: the GPU renderer at 8x (left) and the software renderer, the DS's exact picture (right).</em></p>
+
+<p>
+  <img src="docs/images/pc-menu.jpg" width="70%" alt="PC: the side menu (F1) over the game">
+  <img src="docs/images/pc-save-states.jpg" width="27%" alt="PC: the save state slots, with a picture of each">
+</p>
+<p><em>The PC's side menu (F1) and its save states page.</em></p>
+
+<p>
+  <img src="docs/images/phone-16x9-stick.jpg" width="49%" alt="Phone: widescreen with the on-screen analog stick">
+  <img src="docs/images/phone-4x3-gpu.jpg" width="49%" alt="Phone: 4:3 with the GPU renderer and large controls">
+</p>
+<p>
+  <img src="docs/images/phone-menu.jpg" width="160" alt="Phone: the menu">
+</p>
+<p><em>On a Pixel 8: widescreen with the analog stick, 4:3 with large controls, and the menu.</em></p>
 
 ## Tested on
 
@@ -40,12 +64,11 @@ and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melo
 
 ### Known issues
 
-- **Streaks in the 3D on the phone's GPU renderer (Pixel 8).** Walking around, some ground textures (rock borders,
-  edges where surfaces overlap) smear into horizontal streaks. It happens only with the GPU renderer on the phone, at
-  every resolution, with or without widescreen; the PC's GPU renderer and the phone's software renderer are fine, and
-  the "3D fixes" settings do not change it. So it lies in the phone's OpenGL ES path: either our conversion of the
-  renderer's shaders to OpenGL ES or the phone's GPU driver. Running the `gles-test` build (the phone's shaders on a PC)
-  at the same spot will tell which. Until it is fixed, the software renderer gives the DS's exact picture on the phone.
+- **Streaks in the 3D with the GPU renderer.** Walking around, some ground textures (rock borders, edges where
+  surfaces overlap) smear into horizontal streaks, on the PC and on the phone, at every resolution, with or without
+  widescreen; the "3D fixes" settings do not change it. The software renderer is fine, so it lies in the GPU renderer
+  (melonDS's OpenGL renderer as this project uses it). The compute renderer (PC, in the menu) is the next thing to
+  compare. Until it is fixed, the software renderer gives the DS's exact picture.
 
 ## What you need
 
