@@ -308,7 +308,12 @@ void GlPresenter::end() {
         std::fprintf(stderr, "video: OpenGL error 0x%04x (%d logged)\n", unsigned(e), ++errors_logged_);
     glBindVertexArray(0);
     glUseProgram(0);
-    SDL_GL_SwapWindow(window_);
+    if (!SDL_GL_SwapWindow(window_)) {
+        if (errors_logged_ < 40) {
+            std::fprintf(stderr, "video: SDL_GL_SwapWindow failed: %s\n", SDL_GetError());
+            ++errors_logged_;
+        }
+    }
 }
 
 bool GlPresenter::read_screens(const ntr::Frame& frame, std::vector<uint32_t>& out, int& width, int& height) {
@@ -360,6 +365,28 @@ void set_gl_attributes() {
 
 void GlPresenter::release() { SDL_GL_MakeCurrent(window_, nullptr); }
 
-void GlPresenter::acquire() { SDL_GL_MakeCurrent(window_, context_); }
+bool GlPresenter::acquire() {
+    if (!SDL_GL_MakeCurrent(window_, context_)) return false;
+    return SDL_GL_GetCurrentContext() == context_ && program_ && glIsProgram(program_) && vao_ && glIsVertexArray(vao_);
+}
+
+bool GlPresenter::recover(std::string& error) {
+    // A context lost by Android invalidates all GL names. Abandon those names instead of
+    // deleting them in the replacement context, then create a fresh presenter context.
+    SDL_GL_MakeCurrent(window_, nullptr);
+    context_ = nullptr;
+    program_ = vao_ = vbo_ = soft_tex_ = font_tex_ = read_fbo_ = thumb_tex_ = 0;
+    u_view_ = u_mode_ = u_layer_ = u_color_ = u_tex_ = u_font_ = u_swap_ = -1;
+    gpu_ok_ = false;
+    errors_logged_ = 0;
+    version_.clear();
+    return init(window_, error);
+}
+
+bool GlPresenter::can_display(const ntr::Frame& frame) const {
+    if (SDL_GL_GetCurrentContext() != context_ || !program_ || !glIsProgram(program_) || !vao_ || !glIsVertexArray(vao_))
+        return false;
+    return !frame.gl_texture || glIsTexture(frame.gl_texture);
+}
 
 }  // namespace ph

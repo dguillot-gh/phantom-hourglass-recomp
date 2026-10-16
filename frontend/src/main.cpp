@@ -322,6 +322,7 @@ struct Shared {
     std::atomic<bool> quit{false};
     std::atomic<bool> paused{false};  // the app is in the background (Android): the game waits
     std::atomic<bool> resume_done{false};  // the resume state asked for at quit / going to the background is written (or failed)
+    std::atomic<bool> background_event{false}, foreground_event{false};
 
     // The last finished frame from the software renderer, both screens stacked (top, then bottom).
     std::mutex frame_mutex;
@@ -370,6 +371,29 @@ struct Shared {
     std::atomic<bool> game_done{false};
     int exit_code = 0;
 };
+
+#ifdef __ANDROID__
+// SDL's Android application lifecycle events are delivered to event watches, not the SDL_PollEvent queue.
+bool SDLCALL watch_android_lifecycle(void* userdata, SDL_Event* event) {
+    auto& shared = *static_cast<Shared*>(userdata);
+    switch (event->type) {
+        case SDL_EVENT_WILL_ENTER_BACKGROUND:
+        case SDL_EVENT_DID_ENTER_BACKGROUND:
+            if (!shared.paused.exchange(true)) shared.resume_done = false;
+            shared.background_event = true;
+            std::fprintf(stderr, "android: lifecycle background event %u\n", unsigned(event->type));
+            break;
+        case SDL_EVENT_DID_ENTER_FOREGROUND:
+            shared.foreground_event = true;
+            shared.paused = false;
+            std::fprintf(stderr, "android: lifecycle foreground event\n");
+            break;
+        default:
+            break;
+    }
+    return true;
+}
+#endif
 
 class Host final : public ntr::Host {
 public:
@@ -453,7 +477,17 @@ public:
         if (s_.paused.load()) {  // (Android: the window's surface goes in the background)
             if (gl_) gl_->release();
             while (s_.paused.load() && !s_.quit.load()) SDL_Delay(50);
-            if (gl_) gl_->acquire();
+            if (gl_ && !gl_->acquire()) {
+                std::string error;
+                if (gl_->recover(error)) {
+                    std::fprintf(stderr, "video: Android GL context recovered; using software renderer for this run\n");
+                    rt_->set_video(ntr::VideoSettings{});
+                    s_.gpu_failed = true;
+                } else {
+                    std::fprintf(stderr, "video: could not recover Android GL context: %s\n", error.c_str());
+                    s_.quit = true;
+                }
+            }
         }
         pace();
         return !s_.quit.load();
@@ -582,6 +616,13 @@ private:
             ph::set_wide_extra(vs.wide_extra);
             rt_->set_video(vs);
             video_asked_ = frames_;
+        }
+        if (!gl_->can_display(frame)) {
+            if (!s_.gpu_failed.exchange(true)) {
+                std::fprintf(stderr, "video: Android renderer resources were lost; using software renderer for this run\n");
+                rt_->set_video(ntr::VideoSettings{});
+            }
+            return;
         }
         // A GPU renderer that could not start falls back to software: say so in the menu. (The runtime switches
         // between frames, so until a couple of frames after a change it still reports the renderer it had.)
@@ -966,6 +1007,10 @@ int main(int argc, char** argv) {
     shared.state_dir = data_dir / "states";
     Host host(shared, window, audio, std::move(script), exit_after, unpaced);
     host.set_resume(continue_arg && !testing, !testing);
+#ifdef __ANDROID__
+    const bool lifecycle_watch_registered = SDL_AddEventWatch(watch_android_lifecycle, &shared);
+    if (!lifecycle_watch_registered) std::fprintf(stderr, "android: could not register SDL lifecycle event watch: %s\n", SDL_GetError());
+#endif
     GameThreadArgs args{&shared, window, &host, std::move(rom), code, {}};
     args.options.save_data = read_file(save_path);
     args.options.console_name = "Link";
@@ -1096,6 +1141,15 @@ int main(int argc, char** argv) {
     float finger_x = 0, finger_y = 0;  // window pixels
     std::vector<uint32_t> pixels(size_t(kW) * kH * 2);
     while (!shared.game_done) {
+#ifdef __ANDROID__
+        if (shared.background_event.exchange(false)) {
+            if (audio) SDL_PauseAudioStreamDevice(audio);
+            flush_save();
+        }
+        if (shared.foreground_event.exchange(false)) {
+            if (audio) SDL_ResumeAudioStreamDevice(audio);
+        }
+#endif
         SDL_Event e;
         int win_pw = 1, win_ph = 1;
         SDL_GetWindowSizeInPixels(window, &win_pw, &win_ph);
@@ -1107,19 +1161,6 @@ int main(int argc, char** argv) {
             switch (e.type) {
                 case SDL_EVENT_QUIT: request_quit(); break;
                 case SDL_EVENT_TERMINATING: shared.quit = true; break;  // (no time left for anything)
-                // Android: in the background the game writes the resume state, then waits; the save is written at
-                // once (the app may be killed).
-                case SDL_EVENT_WILL_ENTER_BACKGROUND:
-                case SDL_EVENT_DID_ENTER_BACKGROUND:
-                    if (!shared.paused.load()) shared.resume_done = false;
-                    shared.paused = true;
-                    if (audio) SDL_PauseAudioStreamDevice(audio);
-                    flush_save();
-                    break;
-                case SDL_EVENT_DID_ENTER_FOREGROUND:
-                    shared.paused = false;
-                    if (audio) SDL_ResumeAudioStreamDevice(audio);
-                    break;
                 case SDL_EVENT_FINGER_DOWN:
                 case SDL_EVENT_FINGER_MOTION:
                 case SDL_EVENT_FINGER_UP:
@@ -1345,6 +1386,9 @@ int main(int argc, char** argv) {
 
     shared.quit = true;
     SDL_WaitThread(thread, nullptr);
+#ifdef __ANDROID__
+    if (lifecycle_watch_registered) SDL_RemoveEventWatch(watch_android_lifecycle, &shared);
+#endif
     flush_save();
     if (shared.started == -1) error_box(shared.start_error, window);
     if (!testing) save_settings(settings_path, settings);

@@ -26,7 +26,10 @@ public:
     bool gpu_ok() const { return gpu_ok_; }
     // The phone in the background: its window's surface goes, so the context is let go meanwhile.
     void release();
-    void acquire();
+    bool acquire();
+    // Rebuild the presenter after Android replaces or loses its EGL context.
+    bool recover(std::string& error);
+    bool can_display(const ntr::Frame& frame) const;
 
     // One displayed frame: begin, draw, end (shows it).
     void begin(int width, int height);  // window pixels
