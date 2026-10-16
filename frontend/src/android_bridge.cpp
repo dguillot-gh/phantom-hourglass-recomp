@@ -61,6 +61,28 @@ extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetStretch(
     ph::pad::stretch.store(on != JNI_FALSE ? 1 : 0);
 }
 
+extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetStick(JNIEnv*, jclass, jfloat x, jfloat y) {
+    ph::pad::stick_x.store(int(x * 1000.0f));
+    ph::pad::stick_y.store(int(y * 1000.0f));
+}
+
+extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetWide(JNIEnv*, jclass, jboolean on) {
+    ph::pad::wide.store(on != JNI_FALSE ? 1 : 0);
+}
+
+extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetStickMode(JNIEnv*, jclass, jboolean on) {
+    ph::pad::stick_mode.store(on != JNI_FALSE ? 1 : 0);
+}
+
+extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeRequestResume(JNIEnv*, jclass) {
+    ph::pad::resume_done.store(false);
+    ph::pad::resume_request.store(true);
+}
+
+extern "C" JNIEXPORT jboolean JNICALL Java_com_phrecomp_ph_PhInput_nativeResumeDone(JNIEnv*, jclass) {
+    return ph::pad::resume_done.load() && !ph::pad::resume_request.load() ? JNI_TRUE : JNI_FALSE;
+}
+
 namespace {
 
 // Android drops a native program's stdout and stderr: send both, line by line, to logcat (tag "phrecomp").

@@ -6,7 +6,7 @@ Each component keeps its own licence.
 |---|---|---|---|
 | [melonDS](https://github.com/melonDS-emu/melonDS) | submodule `third_party/melonDS`, pinned; core and renderers only (no JIT, no frontend), patched at configure time by `third_party/CMakeLists.txt` (from FFCCEOT-Recomp) | Hardware model: ARM7, GPU, SPU, timers, DMA, cart, SPI, RTC, Wi-Fi, microphone; software renderer; ARMv5 interpreter fallback | GPL-3.0 |
 | [SDL3](https://github.com/libsdl-org/SDL) | fetched by CMake (`release-3.4.18`), static | Window, input, audio | zlib |
-| teakra, libslirp, glad | bundled inside the melonDS tree and built from it | DSP emulation (DSi), user-mode networking for the emulated Wi-Fi, OpenGL loader | MIT (teakra), BSD-3-Clause (libslirp), MIT/public domain (glad); see each directory |
+| teakra, glad | bundled inside the melonDS tree and built from it | DSP emulation (DSi), OpenGL loader | MIT (teakra), MIT/public domain (glad); see each directory |
 
 `compat/` holds small build shims for compiling the melonDS core with clang-cl/MSVC (from FFCCEOT-Recomp).
 

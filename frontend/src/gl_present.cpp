@@ -230,7 +230,7 @@ void GlPresenter::quad(const Rect& r, float u0, float v0, float u1, float v1) {
     glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
-void GlPresenter::screen(const ntr::Frame& frame, int layer, const Rect& where, bool smooth) {
+void GlPresenter::screen(const ntr::Frame& frame, int layer, const Rect& where, bool smooth, bool wide) {
     glActiveTexture(GL_TEXTURE0);
     if (frame.top && frame.bottom) {
         glBindTexture(GL_TEXTURE_2D_ARRAY, soft_tex_);
@@ -244,9 +244,10 @@ void GlPresenter::screen(const ntr::Frame& frame, int layer, const Rect& where, 
     const int f = smooth ? GL_LINEAR : GL_NEAREST;
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, f);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, f);
-    // A widened picture (the GPU renderer's wide_extra) has the screen's 256 pixels in the middle.
+    // A widened picture (the GPU renderer's wide_extra) has the screen's 256 pixels in the middle; the wide screen
+    // itself is shown whole when asked for (widescreen).
     float u0 = 0, u1 = 1;
-    if (frame.wide_extra > 0) {
+    if (frame.wide_extra > 0 && !(wide && layer == frame.wide_layer)) {
         const float total = 256.0f + 2.0f * float(frame.wide_extra);
         u0 = float(frame.wide_extra) / total;
         u1 = 1 - u0;

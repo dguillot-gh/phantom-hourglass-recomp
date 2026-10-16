@@ -9,15 +9,18 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -41,11 +44,14 @@ public final class LauncherActivity extends Activity {
     private static final int SAVE_SIZE = 512 * 1024;  // the cartridge's 4 Mbit flash
 
     private TextView status;
-    private Button play;
+    private Button play, cont;
 
     private File rom() { return new File(getFilesDir(), "rom/azee.nds"); }
 
     private File save() { return new File(getFilesDir(), "saves/azee.sav"); }
+
+    /** The resume state the game writes when it quits or goes to the background (frontend main.cpp). */
+    private File resume(String ext) { return new File(getFilesDir(), "states/resume." + ext); }
 
     @Override
     protected void onCreate(Bundle state) {
@@ -79,6 +85,9 @@ public final class LauncherActivity extends Activity {
         status.setPadding(0, dp(12), 0, dp(20));
         box.addView(status);
 
+        // Continue: the game from where it was last quit (its resume state); Play: from the title screen.
+        cont = button(box, "Continue", () -> startActivity(new Intent(this, GameActivity.class)
+                .putExtra(GameActivity.EXTRA_CONTINUE, true)));
         play = button(box, "Play", () -> startActivity(new Intent(this, GameActivity.class)));
         button(box, "Choose your game ROM (.nds)", () -> pick(PICK_ROM));
         button(box, "Import a save (.sav)", () -> pick(PICK_SAVE));
@@ -93,7 +102,8 @@ public final class LauncherActivity extends Activity {
         final TextView hint = new TextView(this);
         hint.setText("Use your own dump of the game (USA, clean or D-pad patch). A save from melonDS (.sav) can be "
                 + "imported; the save already here is kept as a dated backup. In the game, touch the picture: it is "
-                + "the stylus. The ≡ button opens the menu.");
+                + "the stylus. The ≡ button opens the menu. Continue picks up where you last quit; a save state never "
+                + "changes the game's own save.");
         hint.setTextColor(0xFF707078);
         hint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         hint.setGravity(Gravity.CENTER);
@@ -124,6 +134,20 @@ public final class LauncherActivity extends Activity {
         status.setText(s);
         play.setEnabled(haveRom);
         play.setAlpha(haveRom ? 1f : 0.5f);
+        final boolean haveResume = haveRom && resume("state").isFile();
+        cont.setVisibility(haveResume ? View.VISIBLE : View.GONE);
+        if (haveResume) cont.setText("Continue  (" + resumeTime() + ")");
+    }
+
+    /** When the resume state was written ("MM-DD HH:MM", from resume.txt). */
+    private String resumeTime() {
+        try (BufferedReader r = new BufferedReader(new FileReader(resume("txt")))) {
+            final String line = r.readLine();
+            if (line != null && !line.isEmpty()) return line.trim();
+        } catch (IOException ignored) {
+            // (no time: the file's date instead)
+        }
+        return new SimpleDateFormat("MM-dd HH:mm", Locale.US).format(new Date(resume("state").lastModified()));
     }
 
     private Button button(LinearLayout box, String text, Runnable action) {

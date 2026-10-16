@@ -1,6 +1,6 @@
 // The PC's side menu (F1 or Esc): a panel over the right part of the window, the game still running beside it
 // (laid out like the Android app's menu). Two pages: Settings (screen, renderer and resolution (1x-8x with the GPU
-// renderer), picture, FPS counter, fullscreen, quit) and Save states (12 slots with a picture of each, save and load).
+// renderer), picture, FPS counter, fullscreen, continue from where you quit, quit) and Save states (12 slots with a picture of each, save and load).
 // The main thread handles its input; the game thread draws it (both from the same geometry).
 #pragma once
 
@@ -31,9 +31,12 @@ struct MenuState {
     std::array<std::string, kStateSlots> slot_time{};  // when each slot was saved ("" = empty)
     int fps_corner = 1;        // the FPS counter's corner of the picture (0 top left .. 3 bottom right)
     bool stretch = false;      // the picture stretched over the window
+    std::string resume_time;   // when the resume state (Continue) was written ("" = none)
+    bool stick = false;        // a gamepad's left stick moves Link as an analog stick (else it is the D-pad)
+    bool wide = false;         // widescreen 16:9 (a test; the GPU renderer only)
 };
 
-enum class MenuResult { None, Changed, Quit, SaveState, LoadState };
+enum class MenuResult { None, Changed, Quit, SaveState, LoadState, Continue };
 
 class Menu {
 public:

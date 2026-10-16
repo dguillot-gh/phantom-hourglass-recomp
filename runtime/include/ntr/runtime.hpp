@@ -70,9 +70,10 @@ struct Frame {
     // layer 1 the bottom.
     unsigned gl_texture = 0;
     int scale = 1;
-    // Widescreen: the array texture is (256 + 2 * wide_extra) * scale texels wide (0: 256 * scale). The top screen's
-    // picture fills it; the bottom screen's 256 pixels are in the middle.
+    // Widescreen: the array texture is (256 + 2 * wide_extra) * scale texels wide (0: 256 * scale). The screen that
+    // shows engine A (the 3D one), layer `wide_layer`, fills it; the other screen's 256 pixels are in the middle.
     int wide_extra = 0;
+    int wide_layer = 0;
     // Measurements of the emulation up to this frame (testing, see docs/TESTING.md).
     double emu_ms = 0;               // host time spent emulating this frame (not the frontend's pacing or presenting)
     uint64_t interp_steps = 0;       // instructions the interpreter ran for the frames' functions this frame
@@ -88,9 +89,6 @@ public:
     // Interleaved stereo samples at 48000 Hz produced during the last frame.
     virtual void on_audio(const int16_t* samples, size_t frames) {}
     virtual void on_save(const uint8_t* data, size_t size) {}
-    // The console's Wi-Fi settings changed (its three connections, 3 x 256 bytes of firmware): the game registered
-    // with the Wi-Fi Connection. Give them back in RuntimeOptions::wifi_settings to keep its user ID and friend code.
-    virtual void on_wifi_settings(const uint8_t* data, size_t size) {}
     // The save state asked for with Runtime::request_save_state (empty: the game gave no moment to take it, see
     // there). Called on the game thread.
     virtual void on_state_saved(std::vector<uint8_t> state) {}
@@ -110,16 +108,11 @@ struct RuntimeOptions {
     uint64_t gx_dump_at_frame = 0;  // write the first 3D scene swapped in at or after this frame to gx_scene.txt
     bool frame_hash = false;   // Frame::state_hash (a few hundred microseconds a frame)
     bool trace_files = false;  // log which ROM file each cartridge read hits (with the frame number)
-    bool net_log = false;      // log the console's internet traffic: DNS lookups and answers, TCP connections
     // Speed-ups (set_fast_cart, set_cpu_speed) at start.
     bool fast_cart = true;
     int cpu_speed = 4;
-    // Online play: the DNS server the console's Wi-Fi settings use, which sends the game's Nintendo Wi-Fi Connection
-    // lookups to a revival server (0.0.0.0: the host's own DNS).
-    std::array<uint8_t, 4> online_dns{};
     uint8_t language = 1;      // the firmware's language, which the game plays in: 0 Japanese, 1 English, 2 French, 3 German, 5 Spanish
     std::string console_name;  // the console's name (its firmware nickname, up to 10 characters, UTF-8; empty: melonDS's)
-    std::vector<uint8_t> wifi_settings;  // from Host::on_wifi_settings in an earlier run (may be empty)
     // Builds with FFCC_TRACE_ENTRY only: write each function's first/last frame and call count here on exit.
     std::string profile_path;
     uint64_t dump_at_frame = 0;  // print the CPU state and recent function entries at this frame (debugging)
@@ -171,6 +164,10 @@ public:
     // memory is never part of loading: the player's own save stays as it is.
     virtual void request_save_state() = 0;
     virtual void request_load_state(std::vector<uint8_t> state) = 0;
+
+    // Reads the ARM9's view of main RAM, DTCM or ITCM (a game hook in the frontend looking at the game's state),
+    // without touching the bus: 0 elsewhere. From Host::on_frame.
+    virtual uint32_t peek32(uint32_t address) const = 0;
 };
 
 // The microphone: while on, the DS's mic hears loud noise, as when the player blows into it or shouts (a button can

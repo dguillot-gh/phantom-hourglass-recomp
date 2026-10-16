@@ -11,4 +11,8 @@ bool select_release(const std::string& game_code);
 // A hook of hooks.txt by name, for the game module; null if there is none of that name.
 void* find_hook(const char* name);
 
+// Widescreen (a test): the 3D drawn `extra` DS pixels wider on each side (0: 4:3). Set with the runtime's
+// VideoSettings::wide_extra (the GPU renderer only).
+void set_wide_extra(int extra);
+
 }  // namespace ph

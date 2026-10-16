@@ -171,6 +171,18 @@ final class PhMenu {
         });
 
         section(list, "Controls");
+        toggle(list, "Widescreen (test)", "16:9 with the GPU renderer: more of the world at the sides. Things may "
+                + "appear late at the edges.", prefs.getBoolean("wide", false), on -> {
+            prefs.edit().putBoolean("wide", on).apply();
+            PhInput.nativeSetWide(on);
+            pad.setWide(on && prefs.getBoolean("gpu", false));
+        });
+        toggle(list, "Analog stick", "In place of the D-pad, like the 3DS's circle pad: Link walks the way you push it, "
+                + "running at the rim. A controller's left stick does the same.", pad.stickMode(), pad::setStickMode);
+        row(list, "Move and resize controls", () -> {
+            close();
+            pad.startEditing();
+        });
         for (String[] g : DsPad.GROUPS) {
             final String id = g[0];
             toggle(list, g[1], null, pad.groupOn(id), on -> pad.setGroup(id, on));

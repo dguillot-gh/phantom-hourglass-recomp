@@ -48,4 +48,19 @@ public final class PhInput {
 
     /** The GPU renderer could not start on this phone (the game is on the software one). */
     public static native boolean nativeGpuFailed();
+
+    /** Widescreen 16:9 (a test; the GPU renderer only): the 3D drawn wider, the HUD in the middle 4:3. */
+    public static native void nativeSetWide(boolean on);
+
+    /** The on-screen analog stick: x, y in -1..1 (y down), 0, 0 at rest. */
+    public static native void nativeSetStick(float x, float y);
+
+    /** The analog stick moves Link (on: the on-screen stick and a controller's left stick), or the D-pad does. */
+    public static native void nativeSetStickMode(boolean on);
+
+    /** Continue: write the resume state (files/states/resume.state, .png, .txt) now, before quitting. */
+    public static native void nativeRequestResume();
+
+    /** The resume state asked for is written (or the game gave no moment for it). */
+    public static native boolean nativeResumeDone();
 }

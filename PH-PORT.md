@@ -56,6 +56,31 @@ shares the config with the clean dump (sha1 4c8f52dd...). melonDS's ROM list giv
   upload/readback. The phone now draws on the game thread with GlPresenter (ES), falling back to SDL's renderer.
   Phone menu: Renderer Software/GPU, resolution 2x-8x. gles-test preset + 4-TEST run it on the PC.
 
+- 2026-10-16 (written, not built yet; syntax-checked for PC and NDK, javac clean):
+  - Wireless removed: FFCC's local wireless with other instances (local_wireless.cpp), the same-PC LAN
+    (instance_lan.cpp), the internet NAT (melonDS's Net_Slirp + libslirp) and the Wi-Fi Connection options are gone.
+    The Platform::MP_* / Net_* hooks are stubs: the console's Wi-Fi hears no one (battle mode finds nobody).
+  - Continue: a resume state (data/states/resume.*) is written when the game quits (PC window, menu, phone Quit) and
+    when the phone sends it to the background (the game runs a frame or two more, undrawn, for the moment to take
+    it). --continue loads it at frame 2; PC: F9, menu "Continue from ..", a note at start; phone: Continue on the
+    start screen. A cartridge save after 30 s of play deletes it (it would go back before that save).
+  - Phone: "Move and resize controls" (DsPad layout editor, a layout per orientation: lay_land_<id> / lay_port_<id>,
+    hide_*), like the PS1 apps' PadOverlay editor.
+  - Analog stick (frontend/src/ph_stick.cpp): holds the stylus at Link + the stick's direction (22-80 px out). Link's
+    screen position comes from gPlayerControl (0x027E0FB8): touch point (+0x10/+0x14) minus mTouchDist (+0x58, q20)
+    along mTouchAngle (+0x6A); which way the angle points is learned in the first 30 frames (logged "stick: ...").
+    Acts only while mUnk_7c (+0x7C) is set. Runtime::peek32 added for it. Phone: the D-pad becomes a stick (menu
+    switch); PC: menu "Gamepad's left stick: D-pad / Analog". To check at home: Link walks the stick's way, no taps
+    land on dialogs, and the log line appears.
+  - Widescreen test (16:9, GPU renderer only; PC menu "Widescreen (test, GPU)", --wide, phone menu switch): the
+    engine's FFCC widescreen path (FfccWideExtra: 3D, engine A's 2D and the final pass drawn 2 x 43 pixels wider),
+    switched on by a "before" hook on G3i_PerspectiveW_ = main 0x02005BFC (found in the generated C: the only
+    function the five r2 = 0x1555 call sites reach, using the hardware divider at 0x04000290), which swaps the 4:3
+    aspect for the wide one and sets ffcc_wide_scene. Frame::wide_layer (engine A's screen, POWCNT1 bit 15) tells
+    the frontend which screen is wide (in PH usually the touch screen); touches beside the DS's 256 pixels go to the
+    nearest edge. HUD edges off: the HUD stays in the middle 4:3, so taps on it line up. Expect objects to appear
+    late at the sides (the game culls to its 4:3 view) and some rooms to show past their walls.
+
 ## Next
 
 1. Build and test save states and the phone's GPU renderer (4-TEST: slot 1, the gles run; then the phone).

@@ -19,5 +19,10 @@ extern std::atomic<int> state_save;  // save a state to this slot (1-12; 0: none
 extern std::atomic<int> state_load;  // load the state in this slot
 extern std::atomic<int> video;       // a renderer asked for: (GPU ? 1 : 0) << 8 | internal resolution; -1: none
 extern std::atomic<bool> gpu_failed; // the GPU renderer could not start (software only)
+extern std::atomic<bool> resume_request;  // write the resume state now (the app is about to quit)
+extern std::atomic<bool> resume_done;     // the resume state asked for is written (or could not be)
+extern std::atomic<int> stick_x, stick_y;  // the on-screen analog stick, -1000..1000 (y down); 0, 0 at rest
+extern std::atomic<int> stick_mode;        // the analog stick moves Link (1) or the D-pad does (0); -1: no change
+extern std::atomic<int> wide;              // widescreen asked for (1 on, 0 off); -1: no change
 
 }  // namespace ph::pad

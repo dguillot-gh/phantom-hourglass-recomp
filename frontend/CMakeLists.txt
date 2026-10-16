@@ -16,12 +16,12 @@ if(ANDROID)
   target_link_options(ph_game PRIVATE -nostdlib)
 
   # SDL's Android activity loads the program as libmain.so and calls its SDL_main.
-  add_library(main SHARED src/main.cpp src/game_module.cpp src/ph_hooks.cpp src/png.cpp src/android_bridge.cpp
+  add_library(main SHARED src/main.cpp src/game_module.cpp src/ph_hooks.cpp src/ph_stick.cpp src/png.cpp src/android_bridge.cpp
               src/gl_present.cpp src/gles_compat.cpp)
   target_include_directories(main PRIVATE src)
   target_compile_options(main PRIVATE -O2)
   target_link_libraries(main PRIVATE ntr_runtime ntr_common SDL3::SDL3-static android log
-                        "$<LINK_GROUP:RESCAN,ntr_runtime,melonds_core,melonds_net>")
+                        "$<LINK_GROUP:RESCAN,ntr_runtime,melonds_core>")
   add_dependencies(main ph_game)
   return()
 endif()
@@ -77,7 +77,7 @@ else()
 endif()
 
 # ---- the program ----
-add_executable(PhantomHourglass src/main.cpp src/game_module.cpp src/ph_hooks.cpp src/png.cpp src/gl_present.cpp src/menu.cpp)
+add_executable(PhantomHourglass src/main.cpp src/game_module.cpp src/ph_hooks.cpp src/ph_stick.cpp src/png.cpp src/gl_present.cpp src/menu.cpp)
 target_include_directories(PhantomHourglass PRIVATE src)
 set_target_properties(PhantomHourglass PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 if(PH_ROM)
@@ -90,7 +90,7 @@ if(PH_GLES_SHADERS)  # (the gles-test preset: the phone's renderer, its ES shade
 endif()
 if(NOT MSVC)
   # melonDS calls the Platform:: functions ntr_runtime defines and ntr_runtime calls melonDS: rescan them (GNU ld).
-  target_link_libraries(PhantomHourglass PRIVATE "$<LINK_GROUP:RESCAN,ntr_runtime,melonds_core,melonds_net>")
+  target_link_libraries(PhantomHourglass PRIVATE "$<LINK_GROUP:RESCAN,ntr_runtime,melonds_core>")
 endif()
 if(WIN32)
   enable_language(RC)

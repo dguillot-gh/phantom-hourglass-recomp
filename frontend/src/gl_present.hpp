@@ -30,7 +30,8 @@ public:
 
     // One displayed frame: begin, draw, end (shows it).
     void begin(int width, int height);  // window pixels
-    void screen(const ntr::Frame& frame, int layer, const Rect& where, bool smooth);  // layer 0 top, 1 bottom
+    // Layer 0 top, 1 bottom. `wide`: a widescreen picture's wide screen is shown whole (else its middle 256 pixels).
+    void screen(const ntr::Frame& frame, int layer, const Rect& where, bool smooth, bool wide = false);
     void fill(const Rect& where, uint32_t argb);
     // 8x8 characters at `size` pixels each; returns the width drawn.
     float text(float x, float y, float size, const std::string& s, uint32_t argb);

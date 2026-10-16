@@ -16,8 +16,14 @@ and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melo
 - **Upscaling**: a GPU renderer draws 2D and 3D at 2x-8x on a PC, 2x-6x on a phone (OpenGL ES 3.2), or the DS's exact
   picture with the software renderer. Sharp or smooth filtering; fit (the DS's shape) or stretched to the screen.
 - **Save states**: 12 slots with a picture of each, on PC and phone. A state never touches the game's own save.
+- **Continue**: quitting (or the phone sending the game to the background) keeps where you were; Continue on the
+  phone's start screen, or F9 / the menu on a PC, picks up from there.
+- **Widescreen** (a test, GPU renderer): 16:9 with more of the world at the sides; things may appear late there.
+- **Analog stick** (optional): in place of the D-pad, like the 3DS's circle pad: Link walks the way it is pushed and
+  runs at the rim (the phone's on-screen stick, a gamepad's left stick).
 - **Android**: touch is the stylus; an on-screen D-pad (the D-pad patch moves Link with it), optional A B X Y, L R,
-  Start/Select; Mic, Lid, Top-screen and Rotate buttons; portrait mode with both screens like a DS held open; gamepads.
+  Start/Select; Mic, Lid, Top-screen and Rotate buttons; portrait mode with both screens like a DS held open; every control can be
+  moved and resized (a layout for each orientation); gamepads.
 - **The microphone and the lid** (the game asks you to blow out candles and to close the DS) are a key or a button.
 - An FPS counter, a side menu on both platforms, and the game's own saves kept as `.sav` files.
 
@@ -102,13 +108,14 @@ workspace and the tools folder.
 | Input | Does |
 |---|---|
 | Mouse (left button) | the stylus, on the touch screen |
-| Arrows, or a gamepad's D-pad or left stick | D-pad |
+| Arrows, or a gamepad's D-pad or left stick | D-pad (the menu can make the left stick an analog stick for Link) |
 | X, Z, S, A | A, B, X, Y (a gamepad by position: A is the right face button) |
 | Q, W / Enter, Right Shift | L, R / Start, Select |
 | **M** (hold), or the right stick's click | blow into the microphone |
 | **C** (hold) | close the DS's lid |
 | **F1** or Esc | the menu: screen, renderer and resolution, picture, FPS counter, fullscreen, save states, quit |
 | **F5** / **F8** | save a state to the chosen slot / load it |
+| **F9** | continue from where you quit |
 | Tab / F2 | the other screen / both screens |
 | F3 / F4 / F11 / F12 | sharp or smooth / FPS counter / fullscreen / screenshot |
 | ` (hold) | fast-forward |
@@ -116,8 +123,10 @@ workspace and the tools folder.
 ## Playing on a phone
 
 Touch the game: it is the stylus. The small buttons are the menu (≡), TOP (the top screen), ⟳ (portrait, both
-screens), MIC (hold to blow) and LID. The menu switches each control on or off, sets their size and opacity, and has
-the renderer, resolution, picture size, FPS counter (drag it anywhere) and the 12 save state slots.
+screens), MIC (hold to blow) and LID. The menu switches each control on or off, sets their size and opacity, turns
+the D-pad into an analog stick, and has "Move and resize controls" (drag each one anywhere; Back or Done keeps it),
+the renderer, resolution, picture size, FPS counter (drag it anywhere) and the 12 save state slots. Quitting keeps
+where you were: the start screen's Continue picks up from there.
 
 ## How it works
 

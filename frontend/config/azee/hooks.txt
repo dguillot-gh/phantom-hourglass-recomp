@@ -10,5 +10,9 @@ main 0200dd04 replace ntr_nitro_save_context   # OS_SaveContext
 main 0200dd50 replace ntr_nitro_load_context   # OS_LoadContext
 main 0200dc98 replace ntr_nitro_init_context   # OS_InitContext
 
+# Widescreen (a test): the projection's aspect ratio, in NitroSDK's G3i_PerspectiveW_ (r2 = aspect, 0x1555 = 4:3;
+# matched by its use of the hardware divider, every perspective scene goes through it).
+main 02005bfc before ph_perspective_aspect      # G3i_PerspectiveW_
+
 # IRQ dispatch: enters OS_IrqHandler_ThreadSwitch explicitly (game/src/ph_hooks.cpp).
 itcm 01ffa48c replace ph_os_irq_handler        # OS_IrqHandler

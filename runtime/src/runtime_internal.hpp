@@ -74,6 +74,7 @@ public:
     unsigned render_between(double x) override;
     void request_save_state() override;
     void request_load_state(std::vector<uint8_t> state) override;
+    uint32_t peek32(uint32_t address) const override;
 
     // ---- save states (savestate.cpp) ----
     bool save_requested() const { return save_requested_; }

@@ -36,13 +36,18 @@ public class GameActivity extends SDLActivity {
     protected String[] getArguments() {
         final File files = getFilesDir();
         final SharedPreferences prefs = getSharedPreferences(DsPad.PREFS, MODE_PRIVATE);
-        return new String[] {
+        final java.util.ArrayList<String> args = new java.util.ArrayList<>(java.util.Arrays.asList(
                 new File(files, "rom/azee.nds").getAbsolutePath(),
                 "--data-dir", files.getAbsolutePath(),
                 "--renderer", prefs.getBoolean("gpu", false) ? "gpu" : "software",
-                "--scale", String.valueOf(Math.min(6, prefs.getInt("scale", 2))),
-        };
+                "--scale", String.valueOf(Math.min(6, prefs.getInt("scale", 2)))));
+        if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_CONTINUE, false)) args.add("--continue");
+        if (prefs.getBoolean("wide", false)) args.add("--wide");
+        return args.toArray(new String[0]);
     }
+
+    /** Intent extra: start from the resume state (the start screen's Continue). */
+    static final String EXTRA_CONTINUE = "continue";
 
     /** The FPS counter on or off (the menu's switch). */
     void setFpsShown(boolean on) { if (fps != null) fps.setShown(on); }
@@ -98,6 +103,8 @@ public class GameActivity extends SDLActivity {
         PhInput.nativeSetFps(false);  // (the phone's counter is the FpsBadge, not drawn in the picture)
         setFpsShown(prefs.getBoolean("fps", false));
         PhInput.nativeSetStretch(prefs.getBoolean("stretch", false));
+        PhInput.nativeSetStickMode(pad.stickMode());
+        pad.setWide(prefs.getBoolean("wide", false) && prefs.getBoolean("gpu", false));
         if (portrait()) pad.setScreen(PhInput.SCREEN_BOTH);
         hideSystemBars();
     }
@@ -136,6 +143,22 @@ public class GameActivity extends SDLActivity {
         return device != null && !device.isVirtual() && device.getKeyboardType() == InputDevice.KEYBOARD_TYPE_ALPHABETIC;
     }
 
+    /** Quit: the resume state first (Continue on the start screen), waiting for it up to a few seconds. */
+    private void quitWithResume() {
+        PhInput.nativeRequestResume();
+        new Thread(() -> {
+            final long until = System.currentTimeMillis() + 6000;
+            while (!PhInput.nativeResumeDone() && System.currentTimeMillis() < until) {
+                try {
+                    Thread.sleep(30);
+                } catch (InterruptedException e) {
+                    break;
+                }
+            }
+            runOnUiThread(this::finish);
+        }).start();
+    }
+
     /** Back asks first: a stray swipe must not end the game. The save is on disk already (the game writes it). */
     @Override
     public void onBackPressed() {
@@ -143,11 +166,16 @@ public class GameActivity extends SDLActivity {
             menu.close();
             return;
         }
+        if (pad != null && pad.isEditing()) {  // and the layout editor (keeping what was moved)
+            pad.stopEditing();
+            return;
+        }
         if (pad != null) pad.releaseAll();
         new AlertDialog.Builder(this)
                 .setTitle("Quit Phantom Hourglass?")
-                .setMessage("Progress since your last save in the game is lost.")
-                .setPositiveButton("Quit", (d, w) -> finish())
+                .setMessage("Continue on the start screen picks up from here next time. (The game's own save "
+                        + "holds only what you saved in the game.)")
+                .setPositiveButton("Quit", (d, w) -> quitWithResume())
                 .setNegativeButton("Keep playing", null)
                 .show();
     }
