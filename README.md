@@ -38,6 +38,15 @@ and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melo
 - **PC:** Windows 11.
 - **Status:** plays on PC and on the Pixel 8. On the phone the GPU renderer at 6x can stutter once the phone warms up; 3x holds a steady 60 fps.
 
+### Known issues
+
+- **Streaks in the 3D on the phone's GPU renderer (Pixel 8).** Walking around, some ground textures (rock borders,
+  edges where surfaces overlap) smear into horizontal streaks. It happens only with the GPU renderer on the phone, at
+  every resolution, with or without widescreen; the PC's GPU renderer and the phone's software renderer are fine, and
+  the "3D fixes" settings do not change it. So it lies in the phone's OpenGL ES path: either our conversion of the
+  renderer's shaders to OpenGL ES or the phone's GPU driver. Running the `gles-test` build (the phone's shaders on a PC)
+  at the same spot will tell which. Until it is fixed, the software renderer gives the DS's exact picture on the phone.
+
 ## What you need
 
 - Your own dump of the game. Supported (checked by SHA-1):
