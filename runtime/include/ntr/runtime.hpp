@@ -59,6 +59,8 @@ struct VideoSettings {
                                      // the game's projection must be widened to match (cfie::aspect)
     bool hud_edges = false;          // OpenGL: the HUD's sprite clusters sit at the edges of the wide picture, not in the middle
     int hud_scale = 100;             // OpenGL: the HUD's size in percent
+    bool hud_sides = false;          // with hud_edges: clusters in the HUD's top and bottom bands go to their side even
+                                     // when not touching the edge, and a full-width bottom bar to the left (PH)
 };
 
 // One finished frame of both screens.

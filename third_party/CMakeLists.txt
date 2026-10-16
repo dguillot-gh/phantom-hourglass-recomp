@@ -142,7 +142,14 @@ ffcc_patch(gpu2d_gl_src GPU2D_OpenGL.cpp "u16* vtxbuf = SpriteVtxData;\n    int 
 # The HUD clusters moved out to the wide picture's edges this frame (engine A), so the frontend can map a touch on one
 # back to the DS pixel the game sees: FfccHudMoved = x0, y0, x1, y1 (DS pixels, before the move), x offset.
 ffcc_patch(gpu2d_gl_src GPU2D_OpenGL.cpp "extern int FfccWideExtra, FfccHudEdges, FfccHudScale; // ffcc patch\n"
-  "extern int FfccWideExtra, FfccHudEdges, FfccHudScale; // ffcc patch\nint FfccHudMoved[16][5]; int FfccHudMovedCount = 0; // ph patch\n")
+  "extern int FfccWideExtra, FfccHudEdges, FfccHudScale; // ffcc patch\nint FfccHudMoved[16][5]; int FfccHudMovedCount = 0; // ph patch\nint FfccHudSides = 0; // ph patch\n")
+# FfccHudSides (Phantom Hourglass): in the HUD's bands (the top 56 rows, the bottom 42) a cluster goes to the side of
+# the screen it is on even when it does not touch the edge (the rupee count beside its icon), and the menu bar that
+# slides out at the bottom (as wide as the screen) stays with the Menu button, at the left.
+ffcc_patch(gpu2d_gl_src GPU2D_OpenGL.cpp "                if (cx1[r] - cx0[r] > 150 || cy1[r] - cy0[r] > 110) continue;\n                const bool left = cx0[r] <= 4, right = cx1[r] >= 252;\n"
+  "                const bool ph_bar = FfccHudSides && cy0[r] >= 150 && cy1[r] - cy0[r] <= 48; // ph patch\n                if ((cx1[r] - cx0[r] > 150 && !ph_bar) || cy1[r] - cy0[r] > 110) continue;\n                bool left = cx0[r] <= 4, right = cx1[r] >= 252;\n                if (FfccHudSides && !left && !right && (cy1[r] <= 56 || cy0[r] >= 150)) { left = cx1[r] <= 128; right = cx0[r] >= 128; }\n                if (ph_bar && left && right) right = false;\n")
+ffcc_patch(gpu2d_gl_src GPU2D_OpenGL.cpp "                if (left && bottom && cy0[r] < 152 && cx1[r] - cx0[r] >= 100)\n"
+  "                if (!FfccHudSides && left && bottom && cy0[r] < 152 && cx1[r] - cx0[r] >= 100) // (ph patch: FFCC's pickup text)\n")
 ffcc_patch(gpu2d_gl_src GPU2D_OpenGL.cpp "        if (GPU2D.Num == 0 && !window) ffcc_text_rect[0] = ffcc_text_rect[2] = 0;\n"
   "        if (GPU2D.Num == 0 && !window) ffcc_text_rect[0] = ffcc_text_rect[2] = 0;\n        if (GPU2D.Num == 0 && !window) FfccHudMovedCount = 0; // ph patch\n        bool ph_recorded[128] = {};\n")
 ffcc_patch(gpu2d_gl_src GPU2D_OpenGL.cpp "                hud[i][3] = scale;\n"

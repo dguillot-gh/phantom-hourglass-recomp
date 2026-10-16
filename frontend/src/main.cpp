@@ -204,6 +204,7 @@ ntr::VideoSettings video_for(const Settings& s) {
     v.scale = s.gpu ? s.scale : 1;
     v.wide_extra = s.gpu && s.wide ? kWideExtra : 0;  // (the game's projection follows: ph::set_wide_extra)
     v.hud_edges = v.wide_extra > 0;  // the HUD at the wide picture's edges (touches on it are mapped back: to_ds)
+    v.hud_sides = v.hud_edges;       // (the rupee count with its icon, the menu bar with the Menu button)
     return v;
 }
 
