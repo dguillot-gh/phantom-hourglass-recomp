@@ -213,3 +213,9 @@ gles_compute_fix("        binned = BinPolygon(Polygons[polygonIdx], coarseTopLef
   "        Polygon polygon = Polygons[polygonIdx];\n        binned = BinPolygon(polygon, coarseTopLeft, coarseBotRight);")
 gles_compute_fix("        if (BinPolygon(Polygons[polygonIdx], fineTileTopLeft, fineTileBotRight))"
   "        Polygon polygon = Polygons[polygonIdx];\n        if (BinPolygon(polygon, fineTileTopLeft, fineTileBotRight))")
+
+# BinCombined shares mergedMaskShared between its invocations. In GLSL (ES too) barrier() only syncs execution: the
+# writes to a shared variable are made visible to the others by memoryBarrierShared() first. Desktop drivers order them
+# anyway; a tile-based phone GPU need not (the 3D came out in scrambled tiles on the Pixel 8).
+gles_compute_fix("    barrier();\n"
+  "    memoryBarrierShared();\n    barrier();\n")

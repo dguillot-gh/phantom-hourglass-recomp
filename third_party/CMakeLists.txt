@@ -191,6 +191,10 @@ file(READ ${MS}/GPU3D_Compute.cpp gpu3d_compute_src)
 string(REPLACE "\r\n" "\n" gpu3d_compute_src "${gpu3d_compute_src}")
 ffcc_patch(gpu3d_compute_src GPU3D_Compute.cpp "    shaderSource += \"#version 430 core\\n\";\n"
   "#ifdef __ANDROID__\n    // ph patch: OpenGL ES 3.2 on the phone (its shaders made GLSL ES by third_party/gles_compute_fixes.cmake).\n    // Every sampler and image type needs a precision.\n    shaderSource += \"#version 320 es\\n\"\n                    \"precision highp float;\\nprecision highp int;\\nprecision highp usampler2D;\\n\"\n                    \"precision highp usampler2DArray;\\nprecision highp sampler2DArray;\\n\"\n                    \"precision highp uimageBuffer;\\nprecision highp image2D;\\n\";\n#else\n    shaderSource += \"#version 430 core\\n\";\n#endif\n")
+# (The final pass writes the 3D picture as an image; the 2D compositor then samples it as a texture, which needs the
+# texture-fetch barrier too. Desktop drivers forgive its absence; a phone GPU's deferred work need not.)
+ffcc_patch(gpu3d_compute_src GPU3D_Compute.cpp "    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);\n"
+  "    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT); // ph patch\n")
 ffcc_write_patched(gpu3d_compute_src ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/GPU3D_Compute.cpp)
 file(READ ${MS}/GPU3D_Compute_shaders.h gpu3d_compute_sh)
 string(REPLACE "\r\n" "\n" gpu3d_compute_sh "${gpu3d_compute_sh}")
