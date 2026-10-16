@@ -92,7 +92,7 @@ public final class DsPad extends View {
     private boolean micOn, lidClosed, topShown, bothShown, hiddenForController;
     private PhMenu menu;  // the ≡ button's panel (GameActivity sets it)
     private boolean stickMode;   // the D-pad is an analog stick
-    private boolean wide;        // the picture is widescreen (wider than the DS's 256 across)
+    private int wideMode;        // 0: normal 4:3; 1: 16:9; 2: 21:9
     private int stickPointer = -1;
     private float knobX, knobY;  // the stick's position, -1..1 (y down)
 
@@ -135,9 +135,9 @@ public final class DsPad extends View {
 
     boolean stickMode() { return stickMode; }
 
-    /** Widescreen: the picture is 342 DS pixels across, not 256 (frontend main.cpp kWideExtra), so the bars are narrower. */
-    void setWide(boolean on) {  // (the menu and GameActivity: off with the compute renderer, which has none)
-        wide = on;
+    /** Widescreen: widen the game view and adjust the touch mapping. */
+    void setWide(int mode) {
+        wideMode = Math.max(0, Math.min(2, mode));
         invalidate();
     }
 
@@ -258,7 +258,7 @@ public final class DsPad extends View {
     // The picture, as frontend/src/layout.hpp places it: its width (landscape) or bottom edge (portrait: at the top, a
     // small margin, one or two DS screens the width of the phone).
     private float pictureWidth() {
-        final float content = bothShown ? 384f : 192f, across = wide ? 342f : 256f;
+        final float content = bothShown ? 384f : 192f, across = wideMode == 2 ? 448f : wideMode == 1 ? 342f : 256f;
         return across * Math.min(getWidth() / across, getHeight() / content);
     }
 
@@ -277,7 +277,13 @@ public final class DsPad extends View {
 
     private float areaTop() { return getHeight() - areaHeight(); }
 
-    private float areaWidth() { return portrait() ? getWidth() / 2f : Math.max(1f, (getWidth() - pictureWidth()) / 2f); }
+    private float areaWidth() {
+        if (portrait()) return getWidth() / 2f;
+        // A 21:9 image is wider than the Pixel's 20:9 display, so it fills the width and leaves no side bars.
+        // Keep a usable control rail over each edge of the image instead of shrinking the controls to zero.
+        final float minimumRail = getHeight() * 0.22f;
+        return Math.max(minimumRail, (getWidth() - pictureWidth()) / 2f);
+    }
 
     private float scaleOf(Control c) { return c.kind == KIND_TOOL ? 1f : sizeScale(); }
 

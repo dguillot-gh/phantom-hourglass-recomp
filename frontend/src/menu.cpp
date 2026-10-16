@@ -47,13 +47,13 @@ Menu::Geometry Menu::geometry(const MenuState& s, float win_w, float win_h, floa
             if (s.gpu && kScales[i] == s.scale) chosen = i + 1;
         r[kResolution] = {"Resolution", {"1x", "2x", "4x", "6x", "8x"}, chosen, {!s.gpu, s.gpu, s.gpu, s.gpu, s.gpu}, {}, {}};
     }
-    const bool gl = s.gpu && !s.compute;  // (texture filtering and widescreen: the OpenGL renderer's)
+    const bool gl = s.gpu && !s.compute;  // texture filtering is only implemented by the classic OpenGL renderer
     r[kTextures] = {"3D textures (GPU)", {"Pixels", "Smooth", "Sharp"}, gl ? s.textures : 0, {true, gl, gl}, {}, {}};
     // (Seams: the GPU renderer's better polygons. Warp: textures the DS bends with the view, cut into a grid.)
     r[kFixes] = {"3D fixes", {"Off", "Seams", "Warp", "Both"}, s.gpu ? s.fixes : s.fixes & 2, {true, s.gpu, true, s.gpu}, {}, {}};
     r[kPicture] = {"Picture", {"Sharp", "Smooth"}, s.smooth ? 1 : 0, {true, true}, {}, {}};
     r[kSize] = {"Picture size", {"Fit", "Stretch"}, s.stretch ? 1 : 0, {true, true}, {}, {}};
-    r[kWide] = {"Widescreen (test, GPU)", {"4:3", "16:9"}, s.wide && gl ? 1 : 0, {true, gl}, {}, {}};
+    r[kWide] = {"Widescreen (test)", {"4:3", "16:9"}, s.wide && s.gpu ? 1 : 0, {true, s.gpu}, {}, {}};
     r[kFps] = {"FPS counter", {"Off", "Top L", "Top R", "Bot L", "Bot R"}, s.fps ? s.fps_corner + 1 : 0,
                {true, true, true, true, true}, {}, {}};
     r[kFullscreen] = {"Fullscreen", {"Off", "On"}, s.fullscreen ? 1 : 0, {true, true}, {}, {}};
@@ -120,7 +120,7 @@ MenuResult Menu::choose(int row, int choice, MenuState& s) {
         case kPicture: s.smooth = choice == 1; break;
         case kSize: s.stretch = choice == 1; break;
         case kWide:
-            if (choice == 1 && (!s.gpu || s.compute)) return MenuResult::None;
+            if (choice == 1 && !s.gpu) return MenuResult::None;
             s.wide = choice == 1;
             break;
         case kFps:

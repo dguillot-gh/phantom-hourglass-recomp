@@ -16,7 +16,7 @@
 //
 //   PhantomHourglass.exe <rom.nds> [--save-file F] [--data-dir D] [--input-script S] [--exit-after-frames N]
 //                        [--fullscreen] [--unpaced] [--module M] [--read-only-save] [--renderer software|gpu|compute]
-//                        [--scale 2|4|6|8] [--continue] [--wide] [--textures pixels|smooth|sharp]
+//                        [--scale 2|4|6|8] [--continue] [--wide] [--wide21] [--textures pixels|smooth|sharp]
 //                        [--fixes 0-3]
 #include <SDL3/SDL.h>
 #ifdef __ANDROID__
@@ -76,12 +76,12 @@ std::atomic<bool> gpu_failed{false};
 std::atomic<bool> resume_request{false};
 std::atomic<int> stick_x{0}, stick_y{0};
 std::atomic<int> stick_mode{-1};
-std::atomic<int> wide{-1};
 std::atomic<int> textures{-1};
 std::atomic<int> fixes{-1};
 std::atomic<int> compute{-1};
 std::atomic<bool> compute_failed{false};
 std::atomic<bool> resume_done{false};
+std::atomic<int> wide_mode{-1};
 }  // namespace ph::pad
 
 namespace {
@@ -92,6 +92,7 @@ constexpr double kFrameSeconds = 560190.0 / 33513982.0;  // one DS frame (59.826
 constexpr int kScales[] = {2, 4, 6, 8};
 constexpr int kSlots = 12;  // save state slots
 constexpr int kWideExtra = 43;  // widescreen (a test): 256 + 2 x 43 = 342 pixels across 192, about 16:9
+constexpr int kUltraWideExtra = 96;  // 256 + 2 x 96 = 448 pixels across 192, 21:9
 constexpr int kResumeSlot = 99;  // the state written at quit, for Continue (resume.*)
 constexpr uint64_t kResumeStaleFrames = 1800;  // a cartridge save after this much play makes the resume state old
 
@@ -152,14 +153,15 @@ struct Settings {
     bool fullscreen = false;
     bool smooth = false;  // linear filtering instead of sharp pixels
     bool fps = false;
-    bool gpu = false;     // the GPU renderer (PC)
-    bool compute = false; // with gpu: melonDS's compute-shader renderer (OpenGL 4.3, PC), else its OpenGL one
+    bool gpu = true;      // the GPU renderer
+    bool compute = true;  // with gpu: melonDS's compute-shader renderer (OpenGL 4.3 / GLES 3.1+)
     int scale = 4;        // its internal resolution
     int slot = 1;         // the save state slot chosen (1-12)
     int fps_corner = 1;   // the FPS counter's corner of the picture (0 top left, 1 top right, 2 bottom left, 3 bottom right)
     bool stretch = false; // the picture stretched over the whole window (else the DS's shape, with bars)
     bool stick = false;   // the analog stick moves Link (a gamepad's left stick, the phone's on-screen stick)
-    bool wide = false;    // widescreen, 16:9 (a test; the GPU renderer only)
+    bool wide = false;    // widescreen, 16:9 (a test; GPU and Compute renderers)
+    int wide_mode = 1;    // 1: 16:9, 2: 21:9
     int textures = 0;     // the 3D's textures with the GPU renderer: 0 the DS's pixels, 1 smooth, 2 sharp
     int fixes = 0;        // 3D fixes, bits: 1 fewer seams (GPU renderer's better polygons), 2 stable textures (no warp)
 };
@@ -183,6 +185,7 @@ Settings load_settings(const fs::path& p) {
         else if (k == "stretch") s.stretch = v == "1";
         else if (k == "stick") s.stick = v == "1";
         else if (k == "wide") s.wide = v == "1";
+        else if (k == "wide_mode") s.wide_mode = std::clamp(std::atoi(v.c_str()), 1, 2);
         else if (k == "textures") s.textures = std::clamp(std::atoi(v.c_str()), 0, 2);
         else if (k == "fixes") s.fixes = std::clamp(std::atoi(v.c_str()), 0, 3);
     }
@@ -206,6 +209,7 @@ void save_settings(const fs::path& p, const Settings& s) {
     f << "stretch=" << (s.stretch ? 1 : 0) << "\n";
     f << "stick=" << (s.stick ? 1 : 0) << "\n";
     f << "wide=" << (s.wide ? 1 : 0) << "\n";
+    f << "wide_mode=" << s.wide_mode << "\n";
     f << "textures=" << s.textures << "\n";
     f << "fixes=" << s.fixes << "\n";
 }
@@ -217,7 +221,7 @@ ntr::VideoSettings video_for(const Settings& s) {
 #ifdef __ANDROID__
     if (s.compute) v.scale = std::min(v.scale, 4);  // (its tile memory at 6x: some 300 MB of a phone's graphics memory)
 #endif
-    v.wide_extra = s.gpu && s.wide ? kWideExtra : 0;  // (the game's projection follows: ph::set_wide_extra)
+    v.wide_extra = s.gpu && s.wide ? (s.wide_mode == 2 ? kUltraWideExtra : kWideExtra) : 0;
     v.hud_edges = v.wide_extra > 0;  // the HUD at the wide picture's edges (touches on it are mapped back: to_ds)
     v.hud_sides = v.hud_edges;       // (the rupee count with its icon, the menu bar with the Menu button)
     v.texture_smoothing = s.textures == 1 ? ntr::TextureSmoothing::Smooth
@@ -559,7 +563,7 @@ private:
     }
 
     // Shows the frame (and the FPS counter, a note, the PC's menu) and applies a renderer change asked for in the menu.
-    void draw(const ntr::Frame& frame) {
+    void draw(const ntr::Frame& frame, bool count_game_frame = true) {
         Settings view;
         bool menu_open, video_dirty;
         int selected, page;
@@ -604,8 +608,8 @@ private:
         if (v.top_shown) gl_->screen(frame, 0, v.top, view.smooth, extra > 0);
         if (v.bottom_shown) gl_->screen(frame, 1, v.bottom, view.smooth, extra > 0);
         // Frames per second: the game's frames shown, counted over a second.
-        fps_frames_++;
-        if (const uint64_t now = SDL_GetTicks(); now - fps_since_ >= 1000) {
+        if (count_game_frame) fps_frames_++;
+        if (count_game_frame) if (const uint64_t now = SDL_GetTicks(); now - fps_since_ >= 1000) {
             ph::pad::game_fps10 = int(fps_frames_ * 10000 / (now - fps_since_));
             fps_frames_ = 0;
             fps_since_ = now;
@@ -849,7 +853,8 @@ int main(int argc, char** argv) {
     // ---- arguments ----
     fs::path rom_path, save_path, data_dir, script_path, module_path = ph::default_module_path();
     uint64_t exit_after = 0;
-    bool fullscreen_arg = false, unpaced = false, read_only_save = false, continue_arg = false, wide_arg = false;
+    bool fullscreen_arg = false, unpaced = false, read_only_save = false, continue_arg = false, wide_arg = false, wide21_arg = false;
+    bool fps_probe_arg = false;
     std::string renderer_arg, textures_arg;
     int scale_arg = 0, fixes_arg = -1;
     for (int i = 1; i < argc; i++) {
@@ -867,6 +872,8 @@ int main(int argc, char** argv) {
         else if (a == "--read-only-save") read_only_save = true;
         else if (a == "--continue") continue_arg = true;
         else if (a == "--wide") wide_arg = true;
+        else if (a == "--wide21") wide_arg = wide21_arg = true;
+        else if (a == "--fps-probe") fps_probe_arg = true;
         else if (a == "--textures" && has) textures_arg = argv[++i];
         else if (a == "--fixes" && has) fixes_arg = std::atoi(argv[++i]);
         else if (a == "--no-settings") {}  // (accepted: tests never write settings anyway, see below)
@@ -915,6 +922,7 @@ int main(int argc, char** argv) {
     Settings settings = testing ? Settings{} : load_settings(settings_path);
     if (fullscreen_arg) settings.fullscreen = true;
     if (wide_arg) settings.wide = true;
+    if (wide21_arg) settings.wide_mode = 2;
     if (textures_arg == "pixels") settings.textures = 0;
     else if (textures_arg == "smooth") settings.textures = 1;
     else if (textures_arg == "sharp") settings.textures = 2;
@@ -961,6 +969,7 @@ int main(int argc, char** argv) {
     GameThreadArgs args{&shared, window, &host, std::move(rom), code, {}};
     args.options.save_data = read_file(save_path);
     args.options.console_name = "Link";
+    args.options.fps_probe = fps_probe_arg;
     args.options.video = video_for(settings);
     ph::set_wide_extra(args.options.video.wide_extra);
     std::fprintf(stderr, "save: %s (%zu bytes)\n", save_path.string().c_str(), args.options.save_data.size());
@@ -1210,8 +1219,12 @@ int main(int argc, char** argv) {
         if (const int want = ph::pad::smooth.exchange(-1); want >= 0) settings.smooth = want != 0, changed = true;
         if (const int want = ph::pad::stretch.exchange(-1); want >= 0) settings.stretch = want != 0, changed = true;
         bool video = false;
-        if (const int want = ph::pad::wide.exchange(-1); want >= 0 && (want != 0) != settings.wide)
-            settings.wide = want != 0, changed = video = true;
+        if (const int want = ph::pad::wide_mode.exchange(-1); want >= 0 && want <= 2) {
+            const bool on = want != 0;
+            const int mode = on ? want : settings.wide_mode;
+            if (settings.wide != on || (on && settings.wide_mode != mode))
+                settings.wide = on, settings.wide_mode = mode, changed = video = true;
+        }
         if (const int want = ph::pad::textures.exchange(-1); want >= 0 && want <= 2 && want != settings.textures)
             settings.textures = want, changed = video = true;
         if (const int want = ph::pad::fixes.exchange(-1); want >= 0 && want <= 3 && want != settings.fixes)

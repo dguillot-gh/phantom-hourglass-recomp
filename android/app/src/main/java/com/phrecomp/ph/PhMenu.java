@@ -25,8 +25,8 @@ import java.io.FileReader;
  * The game's menu (the pad's ≡ button): a scrolling panel over the right part of the screen, the game still
  * visible beside it. Tapping outside it or Back closes it. (Laid out like the PS1 recomp apps' menu.)
  *
- * Screen: touch screen, top screen or both. Display: sharp or smooth picture, FPS counter, renderer (software or
- * GPU) and internal resolution (1×-6× with the GPU renderer). Save states: 12 slots with a picture of each, save and
+ * Screen: touch screen, top screen or both. Display: sharp or smooth picture, FPS counter, Software or Compute
+ * renderer and internal resolution. Save states: 12 slots with a picture of each, save and
  * load. Game: quit. Controls: each on-screen control on or off, opacity, size.
  */
 final class PhMenu {
@@ -137,54 +137,53 @@ final class PhMenu {
                     prefs.edit().putBoolean("fps", on).apply();
                     activity.setFpsShown(on);
                 });
-        // The renderer: the GPU one (OpenGL ES) draws the DS's 2D and 3D at 2× to 8× its size; the software one is
-        // the DS's own picture (1×).
-        final boolean failed = PhInput.nativeGpuFailed();
-        final boolean gpu = prefs.getBoolean("gpu", false) && !failed;
-        final int scale = Math.min(6, prefs.getInt("scale", 2));
-        list.addView(label("Renderer", failed ? "The GPU renderer could not start on this phone: software only."
-                : "GPU draws the game sharper at a higher resolution (uses more battery); Software is the DS's own picture."));
-        final boolean compute = gpu && prefs.getBoolean("compute", false);
-        chips(list, new String[] {"Software", "GPU", "Compute"}, !gpu ? 0 : compute ? 2 : 1, i -> {
-            prefs.edit().putBoolean("gpu", i >= 1).putBoolean("compute", i == 2).apply();
-            PhInput.nativeSetCompute(i == 2);
-            PhInput.nativeSetVideo(i >= 1, prefs.getInt("scale", 2));
-            pad.setWide(i == 1 && prefs.getBoolean("wide", false));
+        // Compute is the Android renderer. If a driver's compute feature is missing, the runtime falls back to
+        // OpenGL automatically; if graphics cannot start at all, it falls back to software.
+        final boolean graphicsFailed = PhInput.nativeGpuFailed();
+        final boolean computeFailed = !graphicsFailed && PhInput.nativeComputeFailed();
+        final boolean hardware = prefs.getBoolean("gpu", true) && !graphicsFailed;
+        final boolean software = !hardware;
+        final int scale = Math.min(4, prefs.getInt("scale", 2));
+        list.addView(label("Renderer", graphicsFailed
+                ? "Hardware rendering could not start; the DS software renderer is active."
+                : computeFailed
+                    ? "Compute is unavailable on this phone; the standard GPU renderer is drawing the game."
+                    : "Compute draws the game at higher resolution with accurate 3D; Software uses the DS's native picture."));
+        chips(list, new String[] {"Software", "Compute"}, software ? 0 : 1, i -> {
+            final boolean useCompute = i == 1;
+            final int newScale = Math.min(4, prefs.getInt("scale", 2));
+            prefs.edit().putBoolean("gpu", useCompute).putBoolean("compute", useCompute)
+                    .putInt("scale", newScale).apply();
+            PhInput.nativeSetCompute(useCompute);
+            PhInput.nativeSetVideo(useCompute, useCompute ? newScale : 1);
+            final int wideMode = useCompute && prefs.getBoolean("wide", false)
+                    ? Math.max(1, Math.min(2, prefs.getInt("wide_mode", 1))) : 0;
+            PhInput.nativeSetWide(wideMode);
+            pad.setWide(wideMode);
             refresh();
-        }, new boolean[] {true, !failed, !failed});
-        if (compute) {
-            list.addView(label("", PhInput.nativeComputeFailed()
-                    ? "Compute cannot run on this phone (its graphics driver lacks a feature it needs): the GPU renderer draws."
-                    : "Compute: the most accurate 3D (no streaks), up to 4×; no widescreen or texture filtering."));
-        }
-        list.addView(label("Internal resolution", gpu ? "How many times the DS's resolution the GPU renderer draws at."
-                : "With the GPU renderer."));
-        // (Up to 6×: at 8× the renderer's buffers ran a Pixel 8 out of graphics memory.)
-        final int[] scales = {1, 2, 4, 6};
+        }, new boolean[] {true, !graphicsFailed});
+        list.addView(label("Internal resolution", hardware ? "Compute resolution; up to 4× on Android."
+                : "Software runs at the DS's native resolution."));
+        // (Compute is capped at 4× on Android.)
+        final int[] scales = {1, 2, 4};
         int chosen = 0;
-        for (int i = 1; i < scales.length; i++) if (gpu && scales[i] == scale) chosen = i;
-        chips(list, new String[] {"1×", "2×", "4×", "6×"}, chosen, i -> {
+        for (int i = 1; i < scales.length; i++) if (hardware && scales[i] == scale) chosen = i;
+        chips(list, new String[] {"1×", "2×", "4×"}, chosen, i -> {
             if (i == 0) return;
             prefs.edit().putInt("scale", scales[i]).apply();
             PhInput.nativeSetVideo(true, scales[i]);
             refresh();
-        }, new boolean[] {!gpu, gpu, gpu, gpu});
-        list.addView(label("3D textures", gpu ? "Pixels keeps the DS's blocky texels; Smooth blends them; Sharp keeps "
-                + "them crisp with soft edges between." : "With the GPU renderer."));
-        final int textures = Math.max(0, Math.min(2, prefs.getInt("textures", 0)));
-        chips(list, new String[] {"Pixels", "Smooth", "Sharp"}, gpu ? textures : 0, i -> {
-            prefs.edit().putInt("textures", i).apply();
-            PhInput.nativeSetTextures(i);
-            refresh();
-        }, new boolean[] {true, gpu, gpu});
-        list.addView(label("3D fixes", "Seams: no thin lines between polygons (GPU renderer). Warp: textures stay put "
-                + "instead of smearing as the view moves."));
-        final int fixes = prefs.getInt("fixes", 0) & 3;
-        chips(list, new String[] {"Off", "Seams", "Warp", "Both"}, gpu ? fixes : fixes & 2, i -> {
-            prefs.edit().putInt("fixes", i).apply();
-            PhInput.nativeSetFixes(i);
-            refresh();
-        }, new boolean[] {true, gpu, true, gpu});
+        }, new boolean[] {software, hardware, hardware});
+        if (computeFailed) {
+            list.addView(label("3D textures", "Compute is unavailable, so the standard GPU renderer is active. Pixels keeps "
+                    + "the DS's blocky texels; Smooth blends them; Sharp keeps them crisp with soft edges between."));
+            final int textures = Math.max(0, Math.min(2, prefs.getInt("textures", 0)));
+            chips(list, new String[] {"Pixels", "Smooth", "Sharp"}, textures, i -> {
+                prefs.edit().putInt("textures", i).apply();
+                PhInput.nativeSetTextures(i);
+                refresh();
+            }, new boolean[] {true, true, true});
+        }
 
         states(list);
 
@@ -195,12 +194,16 @@ final class PhMenu {
         });
 
         section(list, "Controls");
-        toggle(list, "Widescreen (test)", "16:9 with the GPU renderer: more of the world at the sides. Things may "
-                + "appear late at the edges.", prefs.getBoolean("wide", false), on -> {
-            prefs.edit().putBoolean("wide", on).apply();
-            PhInput.nativeSetWide(on);
-            pad.setWide(on && prefs.getBoolean("gpu", false));
-        });
+        final boolean wideAvailable = prefs.getBoolean("gpu", true) && !PhInput.nativeGpuFailed();
+        final int wideMode = prefs.getBoolean("wide", false) ? Math.max(1, Math.min(2, prefs.getInt("wide_mode", 1))) : 0;
+        list.addView(label("Widescreen", "With Compute, shows more of the world at the sides. Some objects may appear late at the edges."));
+        chips(list, new String[] {"4:3", "16:9", "21:9"}, wideMode, i -> {
+            final int mode = wideAvailable ? i : 0;
+            prefs.edit().putBoolean("wide", mode != 0).putInt("wide_mode", mode == 0 ? 1 : mode).apply();
+            PhInput.nativeSetWide(mode);
+            pad.setWide(mode);
+            refresh();
+        }, new boolean[] {true, wideAvailable, wideAvailable});
         toggle(list, "Analog stick", "In place of the D-pad, like the 3DS's circle pad: Link walks the way you push it, "
                 + "running at the rim. A controller's left stick does the same.", pad.stickMode(), pad::setStickMode);
         row(list, "Move and resize controls", () -> {

@@ -36,19 +36,24 @@ public class GameActivity extends SDLActivity {
     protected String[] getArguments() {
         final File files = getFilesDir();
         final SharedPreferences prefs = getSharedPreferences(DsPad.PREFS, MODE_PRIVATE);
+        // Android offers Software or Compute. Migrate the old classic-GPU selection to Compute, while preserving
+        // Software choices from existing installs.
+        final boolean hardware = prefs.getBoolean("gpu", true);
+        prefs.edit().putBoolean("compute", hardware).apply();
         final java.util.ArrayList<String> args = new java.util.ArrayList<>(java.util.Arrays.asList(
                 new File(files, "rom/azee.nds").getAbsolutePath(),
                 "--data-dir", files.getAbsolutePath(),
-                "--renderer", !prefs.getBoolean("gpu", false) ? "software"
-                              : prefs.getBoolean("compute", false) ? "compute" : "gpu",
-                "--scale", String.valueOf(Math.min(6, prefs.getInt("scale", 2)))));
+                "--renderer", hardware ? "compute" : "software",
+                "--scale", String.valueOf(hardware ? Math.min(4, prefs.getInt("scale", 2)) : 1)));
         if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_CONTINUE, false)) args.add("--continue");
-        if (prefs.getBoolean("wide", false)) args.add("--wide");
+        if (getIntent() != null && getIntent().getBooleanExtra("fps_probe", false)) args.add("--fps-probe");
+        if (hardware && prefs.getBoolean("wide", false)) args.add("--wide");
+        if (hardware && prefs.getInt("wide_mode", 1) == 2) args.add("--wide21");
         final String[] textures = {"pixels", "smooth", "sharp"};
         args.add("--textures");
         args.add(textures[Math.max(0, Math.min(2, prefs.getInt("textures", 0)))]);
         args.add("--fixes");
-        args.add(String.valueOf(prefs.getInt("fixes", 0) & 3));
+        args.add("0");
         return args.toArray(new String[0]);
     }
 
@@ -110,7 +115,10 @@ public class GameActivity extends SDLActivity {
         setFpsShown(prefs.getBoolean("fps", false));
         PhInput.nativeSetStretch(prefs.getBoolean("stretch", false));
         PhInput.nativeSetStickMode(pad.stickMode());
-        pad.setWide(prefs.getBoolean("wide", false) && prefs.getBoolean("gpu", false) && !prefs.getBoolean("compute", false));
+        final int wideMode = prefs.getBoolean("wide", false) && prefs.getBoolean("gpu", true)
+                ? Math.max(1, Math.min(2, prefs.getInt("wide_mode", 1))) : 0;
+        pad.setWide(wideMode);
+        PhInput.nativeSetWide(wideMode);
         if (portrait()) pad.setScreen(PhInput.SCREEN_BOTH);
         hideSystemBars();
     }

@@ -55,7 +55,7 @@ struct VideoSettings {
     bool interpolate = false;        // 3D at 60 fps: blend the game's 30 Hz scenes (one frame of latency)
     bool display_rate = false;       // with interpolate and a GL renderer: blend for each displayed frame instead,
                                      // through render_between() (3D at the display's refresh rate)
-    int wide_extra = 0;              // GL renderers: extra 3D pixels on each side of the 256-wide picture, at 1x (widescreen);
+    int wide_extra = 0;              // OpenGL/Compute: extra 3D pixels on each side of the 256-wide picture, at 1x (widescreen);
                                      // the game's projection must be widened to match (cfie::aspect)
     bool hud_edges = false;          // OpenGL: the HUD's sprite clusters sit at the edges of the wide picture, not in the middle
     int hud_scale = 100;             // OpenGL: the HUD's size in percent

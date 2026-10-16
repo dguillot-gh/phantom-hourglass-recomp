@@ -198,6 +198,7 @@ void GlPresenter::shutdown() {
     context_ = nullptr;
 }
 
+
 void GlPresenter::begin(int width, int height) {
     width_ = width > 0 ? width : 1;
     height_ = height > 0 ? height : 1;

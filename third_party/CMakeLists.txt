@@ -136,11 +136,11 @@ string(REPLACE "\r\n" "\n" gpu2d_gl_src "${gpu2d_gl_src}")
 ffcc_patch(gpu2d_gl_src GPU2D_OpenGL.cpp "        cfg.BGOffset[0][0] = xpos - ((xpos & 0x100) << 1);\n"
   "        cfg.BGOffset[0][0] = xpos - ((xpos & 0x100) << 1) + FfccWideExtra; // ffcc patch\n")
 ffcc_patch(gpu2d_gl_src GPU2D_OpenGL.cpp "            cfg.Size[0] = 256; cfg.Size[1] = 192;\n            cfg.Type = 6;\n"
-  "            cfg.Size[0] = 256 + 2 * FfccWideExtra; cfg.Size[1] = 192; // ffcc patch\n            cfg.Type = 6;\n")
+  "            cfg.Size[0] = FfccComputeOutputWidth > 0 ? FfccComputeOutputWidth : 256 + 2 * FfccWideExtra; cfg.Size[1] = 192; // ph patch: sample the padded Compute texture at its real width\n            cfg.Type = 6;\n")
 # Engine A's 2D (its sprite layer, composite and output) is (256 + 2 * extra) pixels wide: the DS's 256 are in the
 # middle, backgrounds stay there, sprites can reach the sides, and the 3D layer fills it (see the shaders below).
 ffcc_patch(gpu2d_gl_src GPU2D_OpenGL.cpp "namespace melonDS\n{\n"
-  "namespace melonDS\n{\nextern int FfccWideExtra, FfccHudEdges, FfccHudScale; // ffcc patch\n// The HUD's pickup text (a line of the engine A background layer 2 beside the HUD's item icon) follows the HUD: the\n// rectangle (x0, y0, x1, y1) of DS pixels is moved like the HUD cluster is (anchor.xy, x offset, scale), 0 if none.\nstatic float ffcc_text_hud[4] = {0, 192, 0, 1}, ffcc_text_rect[4] = {0, 0, 0, 0}, ffcc_text_none[4] = {0, 0, 0, 0};\n")
+  "namespace melonDS\n{\nextern int FfccWideExtra, FfccHudEdges, FfccHudScale; // ffcc patch\nextern int FfccComputeOutputWidth; // ph patch\n// The HUD's pickup text (a line of the engine A background layer 2 beside the HUD's item icon) follows the HUD: the\n// rectangle (x0, y0, x1, y1) of DS pixels is moved like the HUD cluster is (anchor.xy, x offset, scale), 0 if none.\nstatic float ffcc_text_hud[4] = {0, 192, 0, 1}, ffcc_text_rect[4] = {0, 0, 0, 0}, ffcc_text_none[4] = {0, 0, 0, 0};\n")
 ffcc_patch(gpu2d_gl_src GPU2D_OpenGL.cpp "void GLRenderer2D::SetScaleFactor(int scale)\n{\n    if (scale == ScaleFactor)\n        return;\n\n    ScaleFactor = scale;\n    ScreenW = 256 * scale;\n"
   "void GLRenderer2D::SetScaleFactor(int scale)\n{\n    const int extra = (GPU2D.Num == 0) ? FfccWideExtra : 0; // ffcc patch\n    if (scale == ScaleFactor && ScreenW == (256 + 2 * extra) * scale)\n        return;\n\n    ScaleFactor = scale;\n    ScreenW = (256 + 2 * extra) * scale;\n")
 # (engine B shares engine A's compositor and sprite programs, so the extra width is set per draw, from this renderer's)
@@ -189,15 +189,25 @@ ffcc_write_patched(ndscart_src ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/NDSCa
 # tools/check_gles_compute.py checks them.
 file(READ ${MS}/GPU3D_Compute.cpp gpu3d_compute_src)
 string(REPLACE "\r\n" "\n" gpu3d_compute_src "${gpu3d_compute_src}")
+ffcc_patch(gpu3d_compute_src GPU3D_Compute.cpp "namespace melonDS\n{\n\nComputeRenderer3D::ComputeRenderer3D"
+  "namespace melonDS\n{\n\nextern int FfccWideExtra; // ph patch\nint FfccComputeOutputWidth = 0; // ph patch: padded width in DS pixels for the 2D compositor's texture coordinates\n\nComputeRenderer3D::ComputeRenderer3D")
 ffcc_patch(gpu3d_compute_src GPU3D_Compute.cpp "    shaderSource += \"#version 430 core\\n\";\n"
   "#ifdef __ANDROID__\n    // ph patch: OpenGL ES 3.2 on the phone (its shaders made GLSL ES by third_party/gles_compute_fixes.cmake).\n    // Every sampler and image type needs a precision.\n    shaderSource += \"#version 320 es\\n\"\n                    \"precision highp float;\\nprecision highp int;\\nprecision highp usampler2D;\\n\"\n                    \"precision highp usampler2DArray;\\nprecision highp sampler2DArray;\\n\"\n                    \"precision highp uimageBuffer;\\nprecision highp image2D;\\n\";\n#else\n    shaderSource += \"#version 430 core\\n\";\n#endif\n")
 # (The final pass writes the 3D picture as an image; the 2D compositor then samples it as a texture, which needs the
 # texture-fetch barrier too. Desktop drivers forgive its absence; a phone GPU's deferred work need not.)
 ffcc_patch(gpu3d_compute_src GPU3D_Compute.cpp "    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);\n"
   "    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT); // ph patch\n")
+ffcc_patch(gpu3d_compute_src GPU3D_Compute.cpp "    ScaleFactor = scale;\n    ScreenWidth = 256 * ScaleFactor;\n    ScreenHeight = 192 * ScaleFactor;\n"
+  "    ScaleFactor = scale;\n    ScreenWidth = (256 + 2 * FfccWideExtra) * ScaleFactor; // ph patch: keep the compute target aligned with the widened 3D viewport\n    ScreenHeight = 192 * ScaleFactor;\n")
+ffcc_patch(gpu3d_compute_src GPU3D_Compute.cpp "    CoarseTileW = CoarseTileCountX * TileSize;\n    CoarseTileH = CoarseTileCountY * TileSize;\n"
+  "    CoarseTileW = CoarseTileCountX * TileSize;\n    CoarseTileH = CoarseTileCountY * TileSize;\n    ScreenWidth = ((ScreenWidth + CoarseTileW - 1) / CoarseTileW) * CoarseTileW; // ph patch: pad the hidden edge for whole compute tiles\n    FfccComputeOutputWidth = ScreenWidth / ScaleFactor; // ph patch\n")
+ffcc_patch(gpu3d_compute_src GPU3D_Compute.cpp "    glDispatchCompute(TilesPerLine*TileLines/ClearCoarseBinMaskLocalSize, 1, 1);\n"
+  "    glDispatchCompute((TilesPerLine*TileLines + ClearCoarseBinMaskLocalSize - 1)/ClearCoarseBinMaskLocalSize, 1, 1); // ph patch: clear the padded tile range\n")
 ffcc_write_patched(gpu3d_compute_src ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/GPU3D_Compute.cpp)
 file(READ ${MS}/GPU3D_Compute_shaders.h gpu3d_compute_sh)
 string(REPLACE "\r\n" "\n" gpu3d_compute_sh "${gpu3d_compute_sh}")
+ffcc_patch(gpu3d_compute_sh GPU3D_Compute_shaders.h "const std::string ClearCoarseBinMask =\n    BinningBuffer + R\"(\nlayout (local_size_x = ClearCoarseBinMaskLocalSize) in;\n\nvoid main()\n{\n    BinningMaskAndOffset[BinningCoarseMaskStart + gl_GlobalInvocationID.x*CoarseBinStride+0]"
+  "const std::string ClearCoarseBinMask =\n    BinningBuffer + R\"(\nlayout (local_size_x = ClearCoarseBinMaskLocalSize) in;\n\nvoid main()\n{\n    if (gl_GlobalInvocationID.x >= uint(TilesPerLine*TileLines)) return; // ph patch: rounded dispatch\n    BinningMaskAndOffset[BinningCoarseMaskStart + gl_GlobalInvocationID.x*CoarseBinStride+0]")
 include(${CMAKE_CURRENT_SOURCE_DIR}/gles_compute_fixes.cmake)  # (the GLSL ES fixes, for the phone)
 ffcc_write_patched(gpu3d_compute_sh ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/GPU3D_Compute_shaders.h)
 

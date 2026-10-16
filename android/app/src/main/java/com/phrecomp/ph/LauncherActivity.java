@@ -3,6 +3,7 @@ package com.phrecomp.ph;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.net.Uri;
@@ -56,17 +57,18 @@ public final class LauncherActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        final boolean landscape = getResources().getConfiguration().orientation
+                == Configuration.ORIENTATION_LANDSCAPE;
         final LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setGravity(Gravity.CENTER);
-        final int pad = dp(24);
+        final int pad = dp(landscape ? 12 : 24);
         box.setPadding(pad, pad, pad, pad);
-        box.setBackgroundColor(0xFF101014);
 
         final TextView title = new TextView(this);
         title.setText("Phantom Hourglass");
         title.setTextColor(Color.WHITE);
-        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 34);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, landscape ? 26 : 34);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setGravity(Gravity.CENTER);
         box.addView(title);
@@ -74,15 +76,15 @@ public final class LauncherActivity extends Activity {
         final TextView sub = new TextView(this);
         sub.setText("The Legend of Zelda · native recomp");
         sub.setTextColor(0xFF8AB4FF);
-        sub.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        sub.setTextSize(TypedValue.COMPLEX_UNIT_SP, landscape ? 11 : 13);
         sub.setGravity(Gravity.CENTER);
         box.addView(sub);
 
         status = new TextView(this);
         status.setTextColor(0xFFB0B0B8);
-        status.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        status.setTextSize(TypedValue.COMPLEX_UNIT_SP, landscape ? 11 : 14);
         status.setGravity(Gravity.CENTER);
-        status.setPadding(0, dp(12), 0, dp(20));
+        status.setPadding(0, dp(landscape ? 5 : 12), 0, dp(landscape ? 8 : 20));
         box.addView(status);
 
         // Continue: the game from where it was last quit (its resume state); Play: from the title screen.
@@ -105,13 +107,14 @@ public final class LauncherActivity extends Activity {
                 + "the stylus. The ≡ button opens the menu. Continue picks up where you last quit; a save state never "
                 + "changes the game's own save.");
         hint.setTextColor(0xFF707078);
-        hint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        hint.setTextSize(TypedValue.COMPLEX_UNIT_SP, landscape ? 10 : 12);
         hint.setGravity(Gravity.CENTER);
-        hint.setPadding(0, dp(16), 0, 0);
-        box.addView(hint, new LinearLayout.LayoutParams(dp(420), ViewGroup.LayoutParams.WRAP_CONTENT));
+        hint.setPadding(0, dp(landscape ? 8 : 16), 0, 0);
+        box.addView(hint, new LinearLayout.LayoutParams(dp(landscape ? 680 : 420), ViewGroup.LayoutParams.WRAP_CONTENT));
 
         final ScrollView scroll = new ScrollView(this);
-        scroll.setBackgroundColor(0xFF101014);
+        // Separate art keeps the boat clear of the compact landscape controls.
+        scroll.setBackgroundResource(R.drawable.launcher_background);
         scroll.setFillViewport(true);
         scroll.addView(box);
         setContentView(scroll);
@@ -151,12 +154,21 @@ public final class LauncherActivity extends Activity {
     }
 
     private Button button(LinearLayout box, String text, Runnable action) {
+        final boolean landscape = getResources().getConfiguration().orientation
+                == Configuration.ORIENTATION_LANDSCAPE;
         final Button b = new Button(this);
         b.setText(text);
         b.setAllCaps(false);
+        if (landscape) {
+            b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+            b.setMinHeight(dp(36));
+            b.setMinimumHeight(dp(36));
+            b.setPadding(dp(8), 0, dp(8), 0);
+        }
         b.setOnClickListener(v -> action.run());
-        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(320), ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.topMargin = dp(8);
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(landscape ? 300 : 320),
+                landscape ? dp(36) : ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(landscape ? 3 : 8);
         box.addView(b, lp);
         return b;
     }

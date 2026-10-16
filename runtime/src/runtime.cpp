@@ -21,6 +21,10 @@
 #include "ntr/rom.hpp"
 #include "runtime_internal.hpp"
 
+namespace melonDS {
+extern int FfccComputeOutputWidth;
+}
+
 namespace ntr {
 
 using melonDS::CPUExecuteMode;
@@ -976,7 +980,8 @@ void RuntimeImpl::apply_video(VideoSettings s) {
         s.renderer = Renderer::OpenGL;
     }
     // (The widescreen picture is made by the OpenGL and compute renderers only.)
-    if (s.renderer != Renderer::OpenGL) s.wide_extra = 0;
+    if (s.renderer != Renderer::Compute) melonDS::FfccComputeOutputWidth = 0;
+    if (s.renderer == Renderer::Software) s.wide_extra = 0;
     s.wide_extra = std::clamp(s.wide_extra, 0, 256);
     melonDS::FfccWideExtra = s.wide_extra;
     melonDS::FfccStableUV = s.stable_textures;
@@ -1009,8 +1014,8 @@ void RuntimeImpl::apply_video(VideoSettings s) {
     }
     video_ = s;
     video_applied_ = true;
-    log("video: %s renderer, %dx (%dx%d per screen)%s\n", renderer_name(s.renderer), s.scale, 256 * s.scale,
-        192 * s.scale,
+    log("video: %s renderer, %dx (%dx%d per screen)%s\n", renderer_name(s.renderer), s.scale,
+        (256 + 2 * s.wide_extra) * s.scale, 192 * s.scale,
         s.display_rate  ? ", 3D interpolated to the display's refresh rate"
         : s.interpolate ? ", 3D interpolated to 60 fps"
                         : "");

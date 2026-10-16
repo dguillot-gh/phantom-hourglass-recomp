@@ -4,6 +4,7 @@
 #include <jni.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <thread>
 
@@ -74,16 +75,12 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_phrecomp_ph_PhInput_nativeCompute
     return ph::pad::compute_failed.load() ? JNI_TRUE : JNI_FALSE;
 }
 
-extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetFixes(JNIEnv*, jclass, jint bits) {
-    ph::pad::fixes.store(int(bits) & 3);
-}
-
 extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetTextures(JNIEnv*, jclass, jint mode) {
     ph::pad::textures.store(int(mode));
 }
 
-extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetWide(JNIEnv*, jclass, jboolean on) {
-    ph::pad::wide.store(on != JNI_FALSE ? 1 : 0);
+extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetWide(JNIEnv*, jclass, jint mode) {
+    ph::pad::wide_mode.store(std::clamp(int(mode), 0, 2));
 }
 
 extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetStickMode(JNIEnv*, jclass, jboolean on) {

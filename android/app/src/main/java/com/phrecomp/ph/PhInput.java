@@ -43,26 +43,22 @@ public final class PhInput {
     public static native void nativeSaveState(int slot);
     public static native void nativeLoadState(int slot);
 
-    /** The renderer: the GPU one (OpenGL ES) at `scale` (2, 4, 6 or 8) times the DS's resolution, or the software one. */
+    /** Set the hardware renderer (GPU) and its internal resolution. Android requests Compute separately. */
     public static native void nativeSetVideo(boolean gpu, int scale);
 
     /** The GPU renderer could not start on this phone (the game is on the software one). */
     public static native boolean nativeGpuFailed();
 
-    /** The compute renderer (with the GPU one on): more accurate 3D, no streaks; needs OpenGL ES 3.1 and the driver's
-     *  GL_EXT_shader_implicit_conversions, else the OpenGL renderer draws (nativeComputeFailed). */
+    /** Request the Compute renderer; if unavailable, the runtime falls back to OpenGL (nativeComputeFailed). */
     public static native void nativeSetCompute(boolean on);
 
     public static native boolean nativeComputeFailed();
 
-    /** 3D fixes, bits: 1 fewer seams between polygons (GPU renderer), 2 stable textures (no smearing as the view moves). */
-    public static native void nativeSetFixes(int bits);
-
     /** The 3D's textures with the GPU renderer: 0 the DS's pixels, 1 smooth, 2 sharp (crisp, soft only between texels). */
     public static native void nativeSetTextures(int mode);
 
-    /** Widescreen 16:9 (a test; the GPU renderer only): the 3D drawn wider, the HUD in the middle 4:3. */
-    public static native void nativeSetWide(boolean on);
+    /** Widescreen mode: 0 off, 1 16:9, 2 21:9. */
+    public static native void nativeSetWide(int mode);
 
     /** The on-screen analog stick: x, y in -1..1 (y down), 0, 0 at rest. */
     public static native void nativeSetStick(float x, float y);
