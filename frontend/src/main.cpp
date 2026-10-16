@@ -15,7 +15,7 @@
 // on the main thread (software renderer only).
 //
 //   PhantomHourglass.exe <rom.nds> [--save-file F] [--data-dir D] [--input-script S] [--exit-after-frames N]
-//                        [--fullscreen] [--unpaced] [--module M] [--read-only-save] [--renderer software|gpu]
+//                        [--fullscreen] [--unpaced] [--module M] [--read-only-save] [--renderer software|gpu|compute]
 //                        [--scale 2|4|6|8] [--continue] [--wide] [--textures pixels|smooth|sharp]
 //                        [--fixes 0-3]
 #include <SDL3/SDL.h>
@@ -151,6 +151,7 @@ struct Settings {
     bool smooth = false;  // linear filtering instead of sharp pixels
     bool fps = false;
     bool gpu = false;     // the GPU renderer (PC)
+    bool compute = false; // with gpu: melonDS's compute-shader renderer (OpenGL 4.3, PC), else its OpenGL one
     int scale = 4;        // its internal resolution
     int slot = 1;         // the save state slot chosen (1-12)
     int fps_corner = 1;   // the FPS counter's corner of the picture (0 top left, 1 top right, 2 bottom left, 3 bottom right)
@@ -173,7 +174,7 @@ Settings load_settings(const fs::path& p) {
         else if (k == "fullscreen") s.fullscreen = v == "1";
         else if (k == "smooth") s.smooth = v == "1";
         else if (k == "fps") s.fps = v == "1";
-        else if (k == "renderer") s.gpu = v == "gpu";
+        else if (k == "renderer") s.gpu = v == "gpu" || v == "compute", s.compute = v == "compute";
         else if (k == "scale") s.scale = std::atoi(v.c_str());
         else if (k == "slot") s.slot = std::clamp(std::atoi(v.c_str()), 1, kSlots);
         else if (k == "fps_corner") s.fps_corner = std::clamp(std::atoi(v.c_str()), 0, 3);
@@ -196,7 +197,7 @@ void save_settings(const fs::path& p, const Settings& s) {
     f << "fullscreen=" << (s.fullscreen ? 1 : 0) << "\n";
     f << "smooth=" << (s.smooth ? 1 : 0) << "\n";
     f << "fps=" << (s.fps ? 1 : 0) << "\n";
-    f << "renderer=" << (s.gpu ? "gpu" : "software") << "\n";
+    f << "renderer=" << (s.gpu ? (s.compute ? "compute" : "gpu") : "software") << "\n";
     f << "scale=" << s.scale << "\n";
     f << "slot=" << s.slot << "\n";
     f << "fps_corner=" << s.fps_corner << "\n";
@@ -209,7 +210,7 @@ void save_settings(const fs::path& p, const Settings& s) {
 
 ntr::VideoSettings video_for(const Settings& s) {
     ntr::VideoSettings v;
-    v.renderer = s.gpu ? ntr::Renderer::OpenGL : ntr::Renderer::Software;
+    v.renderer = !s.gpu ? ntr::Renderer::Software : s.compute ? ntr::Renderer::Compute : ntr::Renderer::OpenGL;
     v.scale = s.gpu ? s.scale : 1;
     v.wide_extra = s.gpu && s.wide ? kWideExtra : 0;  // (the game's projection follows: ph::set_wide_extra)
     v.hud_edges = v.wide_extra > 0;  // the HUD at the wide picture's edges (touches on it are mapped back: to_ds)
@@ -654,6 +655,7 @@ private:
             ms.wide = view.wide;
             ms.textures = view.textures;
             ms.fixes = view.fixes;
+            ms.compute = view.compute;
             const int layer = view.layout == Layout::Top ? 0 : 1;  // the screen the player looks at
             menu.draw(*gl_, ms, float(w), float(h), ui, float(ph::pad::game_fps10.load()) / 10.0f,
                       [&](int slot, const ph::Rect& r) { gl_->thumbnail(slot, layer, r); });
@@ -909,8 +911,12 @@ int main(int argc, char** argv) {
     else if (textures_arg == "smooth") settings.textures = 1;
     else if (textures_arg == "sharp") settings.textures = 2;
     if (fixes_arg >= 0 && fixes_arg <= 3) settings.fixes = fixes_arg;
-    if (renderer_arg == "gpu") settings.gpu = true;
+    if (renderer_arg == "gpu") settings.gpu = true, settings.compute = false;
+    else if (renderer_arg == "compute") settings.gpu = settings.compute = true;
     else if (renderer_arg == "software") settings.gpu = false;
+#ifdef __ANDROID__
+    settings.compute = false;  // (OpenGL 4.3 only)
+#endif
     if (std::find(std::begin(kScales), std::end(kScales), scale_arg) != std::end(kScales)) settings.scale = scale_arg;
 #ifdef __ANDROID__
     settings.layout = Layout::Bottom;  // (on the phone the on-screen pad chooses the screens: it starts on the touch screen)
@@ -1037,10 +1043,12 @@ int main(int argc, char** argv) {
         ms.wide = settings.wide;
         ms.textures = settings.textures;
         ms.fixes = settings.fixes;
+        ms.compute = settings.compute;
         return ms;
     };
     auto menu_done = [&](const ph::MenuState& ms, ph::MenuResult r) {
-        const bool video = ms.gpu != settings.gpu || ms.scale != settings.scale || ms.wide != settings.wide ||
+        const bool video = ms.gpu != settings.gpu || ms.compute != settings.compute || ms.scale != settings.scale ||
+                           ms.wide != settings.wide ||
                            ms.textures != settings.textures || ms.fixes != settings.fixes;
         if (r == ph::MenuResult::Quit) request_quit();
         settings.layout = ms.layout, settings.gpu = ms.gpu, settings.scale = ms.scale;
@@ -1050,6 +1058,7 @@ int main(int argc, char** argv) {
         settings.wide = ms.wide;
         settings.textures = ms.textures;
         settings.fixes = ms.fixes;
+        settings.compute = ms.compute;
         if (ms.fullscreen != settings.fullscreen) set_fullscreen(ms.fullscreen);
         ph::pad::fps = settings.fps;
         ph::pad::fps_corner = settings.fps_corner;

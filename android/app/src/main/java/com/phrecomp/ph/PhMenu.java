@@ -345,6 +345,22 @@ final class PhMenu {
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.addView(label(name, hint), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         final Switch sw = new Switch(activity);
+        // (The app's theme is the old pre-Holo one, whose switch is a faint ON / OFF label: a track and knob of our own.)
+        final android.content.res.ColorStateList trackColors = new android.content.res.ColorStateList(
+                new int[][] {{android.R.attr.state_checked}, {}}, new int[] {ACCENT, 0xFF44444F});
+        final GradientDrawable track = new GradientDrawable();
+        track.setCornerRadius(px(13));
+        track.setSize(px(46), px(26));
+        track.setColor(trackColors);
+        final GradientDrawable thumb = new GradientDrawable();
+        thumb.setShape(GradientDrawable.OVAL);
+        thumb.setSize(px(26), px(26));
+        thumb.setColor(Color.WHITE);
+        thumb.setStroke(px(3), trackColors);
+        sw.setTrackDrawable(track);
+        sw.setThumbDrawable(thumb);
+        sw.setShowText(false);
+        sw.setText(null);
         sw.setChecked(on);
         sw.setOnCheckedChangeListener((b, checked) -> onToggle.set(checked));
         row.addView(sw);

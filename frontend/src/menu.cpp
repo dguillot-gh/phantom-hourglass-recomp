@@ -39,19 +39,21 @@ Menu::Geometry Menu::geometry(const MenuState& s, float win_w, float win_h, floa
     std::vector<Row>& r = g.rows;
     r.resize(kRowCount);
     r[kScreen] = {"Screen", {"Touch", "Top", "Both"}, int(s.layout), {true, true, true}, {}, {}};
-    r[kRenderer] = {"Renderer", {"Software", "GPU"}, s.gpu ? 1 : 0, {true, !s.gpu_failed}, {}, {}};
+    r[kRenderer] = {"Renderer", {"Software", "GPU", "Compute"}, !s.gpu ? 0 : s.compute ? 2 : 1,
+                    {true, !s.gpu_failed, !s.gpu_failed}, {}, {}};
     {
         int chosen = 0;
         for (int i = 0; i < 4; i++)
             if (s.gpu && kScales[i] == s.scale) chosen = i + 1;
         r[kResolution] = {"Resolution", {"1x", "2x", "4x", "6x", "8x"}, chosen, {!s.gpu, s.gpu, s.gpu, s.gpu, s.gpu}, {}, {}};
     }
-    r[kTextures] = {"3D textures (GPU)", {"Pixels", "Smooth", "Sharp"}, s.gpu ? s.textures : 0, {true, s.gpu, s.gpu}, {}, {}};
+    const bool gl = s.gpu && !s.compute;  // (texture filtering and widescreen: the OpenGL renderer's)
+    r[kTextures] = {"3D textures (GPU)", {"Pixels", "Smooth", "Sharp"}, gl ? s.textures : 0, {true, gl, gl}, {}, {}};
     // (Seams: the GPU renderer's better polygons. Warp: textures the DS bends with the view, cut into a grid.)
     r[kFixes] = {"3D fixes", {"Off", "Seams", "Warp", "Both"}, s.gpu ? s.fixes : s.fixes & 2, {true, s.gpu, true, s.gpu}, {}, {}};
     r[kPicture] = {"Picture", {"Sharp", "Smooth"}, s.smooth ? 1 : 0, {true, true}, {}, {}};
     r[kSize] = {"Picture size", {"Fit", "Stretch"}, s.stretch ? 1 : 0, {true, true}, {}, {}};
-    r[kWide] = {"Widescreen (test, GPU)", {"4:3", "16:9"}, s.wide && s.gpu ? 1 : 0, {true, s.gpu}, {}, {}};
+    r[kWide] = {"Widescreen (test, GPU)", {"4:3", "16:9"}, s.wide && gl ? 1 : 0, {true, gl}, {}, {}};
     r[kFps] = {"FPS counter", {"Off", "Top L", "Top R", "Bot L", "Bot R"}, s.fps ? s.fps_corner + 1 : 0,
                {true, true, true, true, true}, {}, {}};
     r[kFullscreen] = {"Fullscreen", {"Off", "On"}, s.fullscreen ? 1 : 0, {true, true}, {}, {}};
@@ -99,15 +101,16 @@ MenuResult Menu::choose(int row, int choice, MenuState& s) {
     switch (row) {
         case kScreen: s.layout = Layout(choice); break;
         case kRenderer:
-            if (choice == 1 && s.gpu_failed) return MenuResult::None;
-            s.gpu = choice == 1;
+            if (choice >= 1 && s.gpu_failed) return MenuResult::None;
+            s.gpu = choice >= 1;
+            s.compute = choice == 2;
             break;
         case kResolution:
             if (!s.gpu || choice == 0) return MenuResult::None;  // (1x is the software renderer's)
             s.scale = kScales[choice - 1];
             break;
         case kTextures:
-            if (choice != 0 && !s.gpu) return MenuResult::None;
+            if (choice != 0 && (!s.gpu || s.compute)) return MenuResult::None;
             s.textures = choice;
             break;
         case kFixes:
@@ -117,7 +120,7 @@ MenuResult Menu::choose(int row, int choice, MenuState& s) {
         case kPicture: s.smooth = choice == 1; break;
         case kSize: s.stretch = choice == 1; break;
         case kWide:
-            if (choice == 1 && !s.gpu) return MenuResult::None;
+            if (choice == 1 && (!s.gpu || s.compute)) return MenuResult::None;
             s.wide = choice == 1;
             break;
         case kFps:
