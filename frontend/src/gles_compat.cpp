@@ -104,7 +104,11 @@ bool install_gles_compat() {
     load(glad_glProgramParameteri, "glProgramParameteri");
     load(es_clear_depthf, "glClearDepthf");
     load(es_depth_rangef, "glDepthRangef");
-    if (!es_clear_depthf || !es_depth_rangef || !glad_glTexStorage3D || !glad_glDrawBuffers || !glad_glMapBufferRange ||
+    // (Sampler objects, ES 3.0: the 3D's textures repeat / mirror / clamp through them, third_party/CMakeLists.txt.)
+    load(glad_glGenSamplers, "glGenSamplers");
+    load(glad_glBindSampler, "glBindSampler");
+    load(glad_glSamplerParameteri, "glSamplerParameteri");
+    if (!glad_glGenSamplers || !glad_glBindSampler || !glad_glSamplerParameteri ||!es_clear_depthf || !es_depth_rangef || !glad_glTexStorage3D || !glad_glDrawBuffers || !glad_glMapBufferRange ||
         !glad_glFramebufferTexture || !glad_glColorMaski) {
         std::fprintf(stderr, "video: this OpenGL ES lacks functions the GPU renderer needs\n");
         return false;

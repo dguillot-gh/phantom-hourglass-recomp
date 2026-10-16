@@ -101,6 +101,17 @@ ffcc_patch(gpu3d_gl_src GPU3D_OpenGL.cpp "    if (CurShaderID == flags) return;
     }
     glUniform1i(glGetUniformLocation(RenderShader[flags], \"uSmoothTex\"), FfccSmoothTex); // ffcc patch
 ")
+# The 3D textures' wrap modes through sampler objects (ph patch: smeared textures on a phone's GPU, see the code).
+ffcc_patch(gpu3d_gl_src GPU3D_OpenGL.cpp "void GLRenderer3D::SetupPolygonTexture(const RendererPolygon* poly) const\n{\n"
+  "// ph patch: the 3D's textures repeat, mirror or clamp through a sampler object per mode, bound for each draw, instead\n// of changing the texture's own wrap state between draws: a phone's GPU driver (Mali, which draws a frame's draws later\n// in one go) applied a later wrap state to earlier draws, and textures that repeat smeared as if clamped.\nstatic GLuint ph_wrap_samplers[9] = {};\nstatic void ph_bind_wrap_sampler(GLuint unit, GLint s, GLint t)\n{\n    if (!ph_wrap_samplers[0])\n    {\n        const GLint modes[3] = {GL_CLAMP_TO_EDGE, GL_REPEAT, GL_MIRRORED_REPEAT};\n        glGenSamplers(9, ph_wrap_samplers);\n        for (int k = 0; k < 9; k++)\n        {\n            glSamplerParameteri(ph_wrap_samplers[k], GL_TEXTURE_WRAP_S, modes[k / 3]);\n            glSamplerParameteri(ph_wrap_samplers[k], GL_TEXTURE_WRAP_T, modes[k % 3]);\n            glSamplerParameteri(ph_wrap_samplers[k], GL_TEXTURE_MIN_FILTER, GL_NEAREST);\n            glSamplerParameteri(ph_wrap_samplers[k], GL_TEXTURE_MAG_FILTER, GL_NEAREST);\n        }\n    }\n    const int si = s == GL_CLAMP_TO_EDGE ? 0 : s == GL_REPEAT ? 1 : 2;\n    const int ti = t == GL_CLAMP_TO_EDGE ? 0 : t == GL_REPEAT ? 1 : 2;\n    glBindSampler(unit, ph_wrap_samplers[si * 3 + ti]);\n}\n// After the draw: the other passes read these texture units with their textures' own state.\nstatic void ph_unbind_wrap_samplers()\n{\n    for (GLuint unit = 0; unit < 3; unit++) glBindSampler(unit, 0);\n}\n\nvoid GLRenderer3D::SetupPolygonTexture(const RendererPolygon* poly) const\n{\n")
+ffcc_patch(gpu3d_gl_src GPU3D_OpenGL.cpp "    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, repeatS);\n    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, repeatT);\n}\n"
+  "    ph_bind_wrap_sampler(iscap ? (poly->TexID == (GLuint)-1 ? 1 : 2) : 0, repeatS, repeatT); // ph patch\n}\n")
+ffcc_patch(gpu3d_gl_src GPU3D_OpenGL.cpp "    glDrawElements(rp->PrimType, rp->NumIndices, GL_UNSIGNED_SHORT, (void*)(uintptr_t)(rp->IndicesOffset * 2));\n"
+  "    glDrawElements(rp->PrimType, rp->NumIndices, GL_UNSIGNED_SHORT, (void*)(uintptr_t)(rp->IndicesOffset * 2));\n    ph_unbind_wrap_samplers(); // ph patch\n")
+ffcc_patch(gpu3d_gl_src GPU3D_OpenGL.cpp "    glDrawElements(primtype, numindices, GL_UNSIGNED_SHORT, (void*)(uintptr_t)(rp->IndicesOffset * 2));\n"
+  "    glDrawElements(primtype, numindices, GL_UNSIGNED_SHORT, (void*)(uintptr_t)(rp->IndicesOffset * 2));\n    ph_unbind_wrap_samplers(); // ph patch\n")
+ffcc_patch(gpu3d_gl_src GPU3D_OpenGL.cpp "    glDrawElements(GL_LINES, numindices, GL_UNSIGNED_SHORT, (void*)(uintptr_t)(rp->EdgeIndicesOffset * 2));\n"
+  "    glDrawElements(GL_LINES, numindices, GL_UNSIGNED_SHORT, (void*)(uintptr_t)(rp->EdgeIndicesOffset * 2));\n    ph_unbind_wrap_samplers(); // ph patch\n")
 ffcc_write_patched(gpu3d_gl_src ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/GPU3D_OpenGL.cpp)
 
 # GPU_OpenGL.cpp: with FfccWideExtra set, the final output (both screens' layers) is (256 + 2 * extra) pixels wide: engine

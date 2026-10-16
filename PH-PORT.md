@@ -110,3 +110,8 @@ shares the config with the clean dump (sha1 4c8f52dd...). melonDS's ROM list giv
    (`gl_present.cpp`: context 4.3/3.3 core, melonDS's glad, one shader for screens / boxes / 8x8 text from font8x8),
    the runtime's GPU renderer at 2x-8x; F1 menu (`menu.cpp`), FPS counter. 4-TEST adds a GPU 4x run. Phone GPU
    rendering later (melonDS's GL renderer is desktop GL, not GLES). Android still draws with SDL's renderer.
+  - Phone-only GPU streaks while walking (not on PC, not in software, any scale; the 3D fixes did not help): the GL
+    renderer changed the texture array's wrap state (glTexParameteri) before every draw; Mali (tile-based, draws
+    deferred) appears to apply a later state to earlier draws, so repeating textures came out clamped and smeared.
+    Now a sampler object per wrap mode is bound for each draw and unbound after (ph patch in
+    third_party/CMakeLists.txt, GPU3D_OpenGL.cpp); gles_compat loads glGenSamplers/glBindSampler/glSamplerParameteri.
