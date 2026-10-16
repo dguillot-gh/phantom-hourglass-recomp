@@ -47,6 +47,12 @@ and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melo
   | Phantom Hourglass (USA) | `4c8f52dd719918bbcd46e73a8bae8628139c1b85` |
   | Phantom Hourglass (USA), D-pad patch | `7e0d26d143992f1eee182b24f1abb9e7f038eacf` |
 
+  **Clean or D-pad patch?** In the original game the D-pad does not move Link (the patch is what adds that), so with the
+  clean dump the D-pad only does what the game itself uses it for. Turn on the **analog stick** instead (the phone
+  menu's "Analog stick", or the PC menu's "Gamepad's left stick: Analog"): it moves Link by holding the stylus beside
+  him, as you would on a DS, so it works the same with either dump. Everything else (Continue, save states, widescreen,
+  texture filtering, the movable controls) works with both.
+
 - Windows 10 or 11 (64-bit), about 10 GB of disk for the tools and the build. An OpenGL 3.3 graphics card for the GPU
   renderer (the software renderer needs nothing special).
 - For the phone: an Android 8+ phone (arm64; the GPU renderer needs OpenGL ES 3.2) and a USB cable.
