@@ -206,3 +206,10 @@ gles_compute_fix("if (botA > 0)"
   "if (botA > 0U)")
 gles_compute_fix("(32-coverage)"
   "(32U-coverage)")
+
+# Mali (the Pixel 8's driver) will not pass a struct straight out of a readonly buffer to a function ("Function call
+# discards 'readonly' access qualifier"): BinCombined copies the polygon first, as the other shaders already do.
+gles_compute_fix("        binned = BinPolygon(Polygons[polygonIdx], coarseTopLeft, coarseBotRight);"
+  "        Polygon polygon = Polygons[polygonIdx];\n        binned = BinPolygon(polygon, coarseTopLeft, coarseBotRight);")
+gles_compute_fix("        if (BinPolygon(Polygons[polygonIdx], fineTileTopLeft, fineTileBotRight))"
+  "        Polygon polygon = Polygons[polygonIdx];\n        if (BinPolygon(polygon, fineTileTopLeft, fineTileBotRight))")
