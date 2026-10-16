@@ -13,17 +13,19 @@ and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melo
 
 - **Single-screen play**: the touch screen fills the window or the phone; the top screen (the sea map) is a key or a
   tap away, or both screens stacked.
-- **Upscaling**: a GPU renderer draws 2D and 3D at 2x-8x on a PC, 2x-6x on a phone (OpenGL ES 3.2), or the DS's exact
-  picture with the software renderer. Sharp or smooth filtering; fit (the DS's shape) or stretched to the screen.
+- **Upscaling**: the PC's OpenGL renderer draws at 2x-8x; Compute draws at 2x-4x on PC and Android. The Android app
+  also has the DS's exact-resolution software renderer. Sharp or smooth picture scaling; fit (the DS's shape) or
+  stretched to the screen.
 - **Save states**: 12 slots with a picture of each, on PC and phone. A state never touches the game's own save.
 - **Continue**: quitting (or the phone sending the game to the background) keeps where you were; Continue on the
   phone's start screen, or F9 / the menu on a PC, picks up from there.
-- **Widescreen** (a test, GPU renderer): 16:9 with more of the world at the sides; things may appear late there.
+- **Widescreen** (a test, Compute renderer): choose 16:9 or 21:9 to show more of the world at the sides; objects may
+  appear late near the edges because the game was designed for 4:3.
 - **Analog stick** (optional): in place of the D-pad, like the 3DS's circle pad: Link walks the way it is pushed and
   runs at the rim (the phone's on-screen stick, a gamepad's left stick).
-- **Android**: touch is the stylus; an on-screen D-pad (the D-pad patch moves Link with it), optional A B X Y, L R,
-  Start/Select; Mic, Lid, Top-screen and Rotate buttons; portrait mode with both screens like a DS held open; every control can be
-  moved and resized (a layout for each orientation); gamepads.
+- **Android**: Software or Compute rendering; touch is the stylus; an on-screen D-pad (the D-pad patch moves Link with
+  it), optional A B X Y, L R, Start/Select; Mic, Lid, Top-screen and Rotate buttons; portrait mode with both screens
+  like a DS held open; every control can be moved and resized (a layout for each orientation); gamepads.
 - **The microphone and the lid** (the game asks you to blow out candles and to close the DS) are a key or a button.
 - An FPS counter, a side menu on both platforms, and the game's own saves kept as `.sav` files.
 
@@ -47,28 +49,33 @@ and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melo
 <p><em>The PC's side menu (F1) and its save states page.</em></p>
 
 <p>
-  <img src="docs/images/phone-16x9-stick.jpg" width="49%" alt="Phone: widescreen with the on-screen analog stick">
-  <img src="docs/images/phone-4x3-gpu.jpg" width="49%" alt="Phone: 4:3 with the GPU renderer and large controls">
+  <img src="docs/images/phone-4x3-compute-4x.png" width="32%" alt="Pixel 8: 4:3 rendering with Compute at 4x">
+  <img src="docs/images/phone-16x9-compute-4x.png" width="32%" alt="Pixel 8: 16:9 rendering with Compute at 4x">
+  <img src="docs/images/phone-21x9-compute-4x.png" width="32%" alt="Pixel 8: 21:9 rendering with Compute at 4x">
 </p>
+<p><em>On a Pixel 8: Compute at the maximum 4x upscaling in 4:3, 16:9, and 21:9 modes; the 21:9 view is shown on the phone's 20:9 display.</em></p>
 <p>
   <img src="docs/images/phone-menu.jpg" width="160" alt="Phone: the menu">
 </p>
-<p><em>On a Pixel 8: widescreen with the analog stick, 4:3 with large controls, and the menu.</em></p>
+<p><em>The Android side menu.</em></p>
 
 ## Tested on
 
 - **Phone:** Google Pixel 8. Other phones should work (Android 8 or newer, 64-bit ARM) but have not been tried, and GPU
   drivers differ: if the picture looks wrong, the software renderer (1x, in the menu) is the safe fallback.
 - **PC:** Windows 11.
-- **Status:** plays on PC and on the Pixel 8. On the phone the GPU renderer at 6x can stutter once the phone warms up; 3x holds a steady 60 fps.
+- **Status:** plays on PC and on the Pixel 8. A short Pixel 8 check with Compute at 2x reached 59.9 fps, near the
+  game's 59.83 fps target. Longer sessions and 4x performance have not been characterized across devices.
 
 ### Known issues
 
-- **Streaks in the 3D with the GPU renderer.** Walking around, some ground textures (rock borders, edges where
-  surfaces overlap) smear into horizontal streaks, on the PC and on the phone, at every resolution, with or without
-  widescreen. The **compute renderer** (Renderer: Compute in the menu) has none: it needs OpenGL 4.3 on a PC and
-  OpenGL ES 3.1 on a phone (the menu says when a phone lacks it), goes up to 4x on a phone, and has no widescreen or
-  texture filtering yet. The software renderer is fine too (the DS's exact picture).
+- **Streaks in the 3D with the OpenGL renderer.** Walking around, some ground textures (rock borders, edges where
+  surfaces overlap) can smear into horizontal streaks. The **Compute renderer** has no streaks in the tested scenes;
+  it supports 16:9 and 21:9 and goes up to 4x on Android. It needs OpenGL 4.3 on a PC or OpenGL ES 3.1 on Android; if
+  Compute is unavailable, the app reports that and uses the standard GPU renderer where possible. The software
+  renderer is the safe fallback and draws the DS's exact picture.
+- **21:9 controls on a 20:9 phone.** The picture fills the display, so the touch controls sit over its left and right
+  edges instead of in side bars.
 
 ## What you need
 
