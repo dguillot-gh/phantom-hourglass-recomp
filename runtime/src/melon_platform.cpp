@@ -14,14 +14,18 @@
 #include "Platform.h"
 #include "SPI_Firmware.h"
 #include "runtime_internal.hpp"
+#include "mic_sample_data.hpp"
 
 namespace ntr {
 namespace {
 std::atomic<bool> g_mic_blow{false};
+std::atomic<bool> g_mic_sample{false};
 std::atomic<bool> g_lid_closed{false};
 }
 void set_mic_blow(bool on) { g_mic_blow.store(on, std::memory_order_relaxed); }
 bool mic_blow() { return g_mic_blow.load(std::memory_order_relaxed); }
+void set_mic_sample(bool on) { g_mic_sample.store(on, std::memory_order_relaxed); }
+bool mic_sample_active() { return g_mic_sample.load(std::memory_order_relaxed); }
 void set_lid_closed(bool closed) { g_lid_closed.store(closed, std::memory_order_relaxed); }
 bool lid_closed() { return g_lid_closed.load(std::memory_order_relaxed); }
 }  // namespace ntr
@@ -208,6 +212,22 @@ void Mic_Stop(void*) {}
 // The microphone hears loud noise while the frontend holds its "blow" input (ntr::set_mic_blow): enough for games
 // that ask to blow into the mic or shout. Otherwise it hears nothing.
 int Mic_ReadInput(s16* data, int maxlength, void*) {
+    if (ntr::mic_sample_active()) {
+        // The supplied sample is 8 kHz; the DS microphone is clocked at roughly 47.6 kHz.
+        // Hold the last source value for the appropriate number of output samples and loop while held.
+        static uint32_t source_pos = 0;
+        static uint32_t rate_phase = 0;
+        for (int i = 0; i < maxlength; i++) {
+            data[i] = s16((int(ntr::mic_sample::kSamples[source_pos]) - 128) << 8);
+            rate_phase += 8000;
+            while (rate_phase >= 47619) {
+                rate_phase -= 47619;
+                source_pos++;
+                if (source_pos >= ntr::mic_sample::kSampleCount) source_pos = 0;
+            }
+        }
+        return maxlength;
+    }
     if (!ntr::mic_blow()) return 0;
     static u32 seed = 0x12345678u;
     for (int i = 0; i < maxlength; i++) {

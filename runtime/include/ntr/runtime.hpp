@@ -183,6 +183,9 @@ public:
 // stand in for the mic). Thread-safe.
 void set_mic_blow(bool on);
 bool mic_blow();
+// Play the embedded blow sample while held (separate from generated noise for shout interactions).
+void set_mic_sample(bool on);
+bool mic_sample_active();
 
 // The lid: closed while on (games that ask to close the DS, e.g. to stamp a map from one screen onto the other). The
 // runtime applies it at the next frame boundary. Thread-safe.
