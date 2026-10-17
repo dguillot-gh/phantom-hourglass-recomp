@@ -16,6 +16,8 @@ public final class PhInput {
 
     /** The Mic button: while on, the microphone hears blowing. */
     public static native void nativeSetMic(boolean on);
+    /** Plays the bundled blow sample while held. */
+    public static native void nativeSetMicSample(boolean on);
 
     /** The Lid button: the DS closed (on) or open. */
     public static native void nativeSetLid(boolean closed);

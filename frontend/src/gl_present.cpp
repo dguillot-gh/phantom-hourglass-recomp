@@ -303,9 +303,11 @@ void GlPresenter::thumbnail(int slot, int layer, const Rect& where) {
 }
 
 void GlPresenter::end() {
-    // OpenGL errors from the frame (the GPU renderer's included): the first few, in the log (on a phone, logcat).
+#if defined(PH_GL_DIAGNOSTICS)
+    // OpenGL error polling can force driver work on some phones; enable only for diagnosis.
     for (GLenum e; errors_logged_ < 40 && (e = glGetError()) != GL_NO_ERROR;)
         std::fprintf(stderr, "video: OpenGL error 0x%04x (%d logged)\n", unsigned(e), ++errors_logged_);
+#endif
     glBindVertexArray(0);
     glUseProgram(0);
     if (!SDL_GL_SwapWindow(window_)) {
@@ -376,6 +378,8 @@ bool GlPresenter::recover(std::string& error) {
     SDL_GL_MakeCurrent(window_, nullptr);
     context_ = nullptr;
     program_ = vao_ = vbo_ = soft_tex_ = font_tex_ = read_fbo_ = thumb_tex_ = 0;
+    checked_frame_texture_ = 0;
+    checked_frame_texture_valid_ = true;
     u_view_ = u_mode_ = u_layer_ = u_color_ = u_tex_ = u_font_ = u_swap_ = -1;
     gpu_ok_ = false;
     errors_logged_ = 0;
@@ -384,9 +388,15 @@ bool GlPresenter::recover(std::string& error) {
 }
 
 bool GlPresenter::can_display(const ntr::Frame& frame) const {
-    if (SDL_GL_GetCurrentContext() != context_ || !program_ || !glIsProgram(program_) || !vao_ || !glIsVertexArray(vao_))
+    if (SDL_GL_GetCurrentContext() != context_ || !program_ || !vao_)
         return false;
-    return !frame.gl_texture || glIsTexture(frame.gl_texture);
+    // Frame texture names are stable during normal rendering. Checking GL object validity every frame
+    // can serialize the CPU with the driver, so only validate when the runtime changes the texture.
+    if (frame.gl_texture != checked_frame_texture_) {
+        checked_frame_texture_ = frame.gl_texture;
+        checked_frame_texture_valid_ = !frame.gl_texture || glIsTexture(frame.gl_texture);
+    }
+    return checked_frame_texture_valid_;
 }
 
 }  // namespace ph

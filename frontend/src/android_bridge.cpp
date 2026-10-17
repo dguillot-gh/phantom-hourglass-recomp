@@ -18,6 +18,10 @@ extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetMic(JNIE
     ph::pad::blow.store(on != JNI_FALSE);
 }
 
+extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetMicSample(JNIEnv*, jclass, jboolean on) {
+    ph::pad::blow_sample.store(on != JNI_FALSE);
+}
+
 extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetLid(JNIEnv*, jclass, jboolean closed) {
     ph::pad::lid.store(closed != JNI_FALSE);
 }

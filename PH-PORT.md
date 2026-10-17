@@ -10,7 +10,7 @@ Build on the home PC with `..\RUN-ALL.ps1` (see `..\START-HERE.md`).
 
 | File | What |
 |---|---|
-| `frontend/src/main.cpp` | the program: one SDL window, one screen (the touch screen by default, Tab for the top, F2 both), letterboxed so it is never cropped; mouse = stylus; keyboard + gamepad; M / right-stick click = blow into the mic; 48 kHz audio; saves written atomically; `--input-script` for unattended tests |
+| `frontend/src/main.cpp` | the program: one SDL window, one screen (the touch screen by default, Tab for the top, F2 both), letterboxed so it is never cropped; mouse = stylus; keyboard + gamepad; M / right-stick click = generated mic noise, N = bundled blow sample; 48 kHz audio; saves written atomically; `--input-script` for unattended tests |
 | `frontend/src/game_module.cpp` | loads `ph_game.dll` (the recompiled game) and hands it the runtime's services and our hooks |
 | `frontend/src/ph_hooks.cpp` | the NitroSDK hooks with Phantom Hourglass's addresses |
 | `frontend/src/png.cpp` | screenshots (minimal PNG writer) |

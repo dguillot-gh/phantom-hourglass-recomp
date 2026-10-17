@@ -1,8 +1,9 @@
 // The Legend of Zelda: Phantom Hourglass -- native recomp, the program (PC and Android).
 //
 // One window showing one DS screen at a time (the touch screen by default), scaled to fit at the DS's aspect ratio
-// (black bars, never cropped). The mouse or a finger is the stylus. Microphone: hold M (or click the right stick) to
-// blow into it. Lid: hold C to close the DS. F1 or Esc opens the menu (PC); the Android app has its own (PhMenu).
+// (black bars, never cropped). The mouse or a finger is the stylus. Microphone: hold M (or click the right stick) for
+// generated noise, or N / BLOW for the bundled blow sample. Lid: hold C to close the DS. F1 or Esc opens the menu (PC);
+// the Android app has its own (PhMenu).
 // Save states: 12 slots in <data>/states (slot-NN.state, .png both screens when taken, .txt when); F5 saves to the slot
 // chosen in the menu, F8 loads it. The cartridge save (the game's own saving) is never touched by them.
 // Continue: quitting (and on the phone, going to the background) first writes a "resume" state (resume.state, .png,
@@ -62,6 +63,7 @@ using ph::Layout;
 namespace ph::pad {
 std::atomic<uint32_t> held{0};
 std::atomic<bool> blow{false};
+std::atomic<bool> blow_sample{false};
 std::atomic<bool> lid{false};
 std::atomic<int> show{-1};
 std::atomic<int> smooth{-1};
@@ -312,6 +314,7 @@ struct Shared {
     std::atomic<int> touch_x{0}, touch_y{0};
     std::atomic<bool> fast_forward{false};
     std::atomic<bool> blow{false};  // the player's "blow into the mic" input is held
+    std::atomic<bool> blow_sample{false};
     std::atomic<bool> stick_on{false};       // the analog stick moves Link (ph_stick.hpp)
     std::atomic<int> stick_x{0}, stick_y{0};  // where it is, -1000..1000 (y down)
     // Widescreen as drawn: the extra pixels each side of the wide screen (0: none), and its layer (0 top, 1 bottom).
@@ -428,6 +431,7 @@ public:
         bool touching = live && s_.touching.load();
         int tx = s_.touch_x.load(), ty = s_.touch_y.load();
         bool blow = live && s_.blow.load();
+        bool blow_sample = live && s_.blow_sample.load();
         if (live && s_.stick_on.load()) {  // (a finger on the touch screen comes first)
             const float sx = touching ? 0.0f : float(s_.stick_x.load()) / 1000.0f;
             const float sy = touching ? 0.0f : float(s_.stick_y.load()) / 1000.0f;
@@ -458,6 +462,7 @@ public:
         if (const int slot = s_.state_save.exchange(0)) start_save(slot);
         if (const int slot = s_.state_load.exchange(0)) start_load(slot);
         ntr::set_mic_blow(blow);
+        ntr::set_mic_sample(blow_sample);
         rt_->set_buttons(held, pressed);
         if (touching)
             rt_->touch(std::clamp(tx, 0, kW - 1), std::clamp(ty, 0, kH - 1));
@@ -1249,9 +1254,10 @@ int main(int argc, char** argv) {
             shared.stick_y = int(std::clamp(sy, -1.0f, 1.0f) * 1000.0f);
         }
         shared.fast_forward = !menu_open && keys[SDL_SCANCODE_GRAVE];
-        // The microphone: M, or the right stick's click, stands for blowing into it (or shouting).
+        // The microphone: M / stick click provides generated noise for shouting; N plays the blow sample.
         shared.blow = (!menu_open && keys[SDL_SCANCODE_M]) ||
                       (pad && SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_RIGHT_STICK)) || ph::pad::blow.load();
+        shared.blow_sample = (!menu_open && keys[SDL_SCANCODE_N]) || ph::pad::blow_sample.load();
         // The lid: closed while C is held (or the pad's Lid button is on).
         ntr::set_lid_closed((!menu_open && keys[SDL_SCANCODE_C]) || ph::pad::lid.load());
         // Choices from the Android app's on-screen pad and menu.
