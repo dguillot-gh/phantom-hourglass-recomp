@@ -11,23 +11,29 @@ and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melo
 
 ## Features
 
-- **Single-screen play**: the touch screen fills the window or the phone; the top screen (the sea map) is a key or a
-  tap away, or both screens stacked.
-- **Upscaling**: the PC's OpenGL renderer draws at 2x-8x; Compute draws at 2x-4x on PC and Android. The Android app
-  also has the DS's exact-resolution software renderer. Sharp or smooth picture scaling; fit (the DS's shape) or
-  stretched to the screen.
-- **Save states**: 12 slots with a picture of each, on PC and phone. A state never touches the game's own save.
-- **Continue**: quitting (or the phone sending the game to the background) keeps where you were; Continue on the
-  phone's start screen, or F9 / the menu on a PC, picks up from there.
-- **Widescreen** (a test, Compute renderer): choose 16:9 or 21:9 to show more of the world at the sides; objects may
-  appear late near the edges because the game was designed for 4:3.
-- **Analog stick** (optional): in place of the D-pad, like the 3DS's circle pad: Link walks the way it is pushed and
-  runs at the rim (the phone's on-screen stick, a gamepad's left stick).
-- **Android**: Software or Compute rendering; touch is the stylus; an on-screen D-pad (the D-pad patch moves Link with
-  it), optional A B X Y, L R, Start/Select; Mic, Lid, Top-screen and Rotate buttons; portrait mode with both screens
-  like a DS held open; every control can be moved and resized (a layout for each orientation); gamepads.
-- **The microphone and the lid** (the game asks you to blow out candles and to close the DS) are a key or a button.
-- An FPS counter, a side menu on both platforms, and the game's own saves kept as `.sav` files.
+- **Native game code**: the ARM9 program and all 62 overlays are statically recompiled to native code; melonDS models
+  the DS hardware around it.
+- **Screen layouts**: show the touch screen, the top screen (including the sea chart), or both screens stacked.
+  Choose the DS's 4:3 shape or stretch the picture to fill the display.
+- **Renderers and resolution**: exact-resolution Software rendering, the OpenGL GPU renderer, and the Compute renderer.
+  The PC supports 2×–8× upscaling; Android supports up to 4× with Compute. The app selects a compatible renderer and
+  offers the software renderer as a fallback.
+- **Picture options**: sharp or smooth screen scaling; the GPU renderer also offers pixel, smooth, or sharp 3D texture
+  filtering. The PC menu includes optional 3D seam and texture stability fixes.
+- **Widescreen**: Compute rendering can expand the view to 16:9 or 21:9. The HUD follows the wide view and moved HUD
+  areas continue to respond to touch.
+- **Touch and controller input**: touch or mouse controls the stylus. Use keyboard, gamepad, or Android's on-screen
+  D-pad and optional A/B/X/Y, L/R, Start/Select buttons. The D-pad moves Link with the supported D-pad-patched ROM;
+  the optional analog-stick mode works with either supported ROM and with the phone or a gamepad's left stick.
+- **Microphone controls**: generated noise for shouting (M, right-stick click, or MIC) and a bundled recorded blow
+  sample for blow-sensitive interactions (N or the separate BLOW button). Hold either control while using the in-game
+  microphone interaction.
+- **Android controls**: MIC, BLOW, lid, top-screen, and rotate buttons; portrait mode stacks both screens like an open
+  DS. Toggle control groups, change their size and opacity, or move and resize each control with separate portrait and
+  landscape layouts.
+- **Save and resume**: 12 save-state slots with screenshots, separate from the game's own `.sav` save. Continue resumes
+  after quitting or returning from the phone background; existing game saves remain in place.
+- **Convenience features**: FPS counter, side menus on both platforms, PC fullscreen and screenshots, and fast-forward.
 
 ## Pictures
 
@@ -66,16 +72,6 @@ and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melo
 - **PC:** Windows 11.
 - **Status:** plays on PC and on the Pixel 8. A short Pixel 8 check with Compute at 2x reached 59.9 fps, near the
   game's 59.83 fps target. Longer sessions and 4x performance have not been characterized across devices.
-
-### Known issues
-
-- **Streaks in the 3D with the OpenGL renderer.** Walking around, some ground textures (rock borders, edges where
-  surfaces overlap) can smear into horizontal streaks. The **Compute renderer** has no streaks in the tested scenes;
-  it supports 16:9 and 21:9 and goes up to 4x on Android. It needs OpenGL 4.3 on a PC or OpenGL ES 3.1 on Android; if
-  Compute is unavailable, the app reports that and uses the standard GPU renderer where possible. The software
-  renderer is the safe fallback and draws the DS's exact picture.
-- **21:9 controls on a 20:9 phone.** The picture fills the display, so the touch controls sit over its left and right
-  edges instead of in side bars.
 
 ## What you need
 
@@ -156,7 +152,8 @@ workspace and the tools folder.
 | Arrows, or a gamepad's D-pad or left stick | D-pad (the menu can make the left stick an analog stick for Link) |
 | X, Z, S, A | A, B, X, Y (a gamepad by position: A is the right face button) |
 | Q, W / Enter, Right Shift | L, R / Start, Select |
-| **M** (hold), or the right stick's click | blow into the microphone |
+| **M** (hold), or the right stick's click | generated microphone noise for shouting |
+| **N** (hold) | play the bundled blow sample |
 | **C** (hold) | close the DS's lid |
 | **F1** or Esc | the menu: screen, renderer and resolution, picture, FPS counter, fullscreen, save states, quit |
 | **F5** / **F8** | save a state to the chosen slot / load it |
@@ -168,7 +165,8 @@ workspace and the tools folder.
 ## Playing on a phone
 
 Touch the game: it is the stylus. The small buttons are the menu (≡), TOP (the top screen), ⟳ (portrait, both
-screens), MIC (hold to blow) and LID. The menu switches each control on or off, sets their size and opacity, turns
+screens), MIC (generated noise), BLOW (the recorded sample), and LID. Hold MIC for shouting interactions or BLOW for
+sample-based blow interactions. The menu switches each control group on or off, sets their size and opacity, turns
 the D-pad into an analog stick, and has "Move and resize controls" (drag each one anywhere; Back or Done keeps it),
 the renderer, resolution, picture size, FPS counter (drag it anywhere) and the 12 save state slots. Quitting keeps
 where you were: the start screen's Continue picks up from there.
