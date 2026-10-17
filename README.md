@@ -21,7 +21,8 @@ and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melo
 - **Picture options**: sharp or smooth screen scaling; the GPU renderer also offers pixel, smooth, or sharp 3D texture
   filtering. The PC menu includes optional 3D seam and texture stability fixes.
 - **Widescreen**: Compute rendering can expand the view to 16:9 or 21:9. The HUD follows the wide view and moved HUD
-  areas continue to respond to touch.
+  areas continue to respond to touch. At 21:9, some scenery and other elements can pop into view near the edges because
+  the game's visibility checks were designed for 4:3.
 - **Touch and controller input**: touch or mouse controls the stylus. Use keyboard, gamepad, or Android's on-screen
   D-pad and optional A/B/X/Y, L/R, Start/Select buttons. The D-pad moves Link with the supported D-pad-patched ROM;
   the optional analog-stick mode works with either supported ROM and with the phone or a gamepad's left stick.
