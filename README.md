@@ -5,6 +5,7 @@ A native port of **The Legend of Zelda: Phantom Hourglass** (Nintendo DS) to Win
 to C and compiled ahead of time for your machine, instead of being emulated. The rest of the console (the ARM7, graphics
 and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melonDS) core.
 
+
 > **This repository contains no game data.** You build the game from your own legally dumped cartridge: the scripts
 > recompile your ROM on your PC, and nothing made from it is ever committed or shared. Please do not share the builds
 > you make (the game folder and the APK contain the game).
@@ -73,6 +74,7 @@ and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melo
 - **PC:** Windows 11.
 - **Status:** plays on PC and on the Pixel 8. A short Pixel 8 check with Compute at 2x reached 59.9 fps, near the
   game's 59.83 fps target. Longer sessions and 4x performance have not been characterized across devices.
+- Play tested up until the Fire Temple (which prompted a fix for using the microphone to essentially finish the rest of the game). Some boss fights do require you to swap or rotate screens in order for you to complete them properly. a small price to pay for having this game portable. 90% can be played on a single screen. 
 
 ## What you need
 
