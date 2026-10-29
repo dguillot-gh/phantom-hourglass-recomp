@@ -86,3 +86,8 @@ elseif(sh STREQUAL "FinalPassFS")
   gles_fix("vec2(xs, fTexcoord.y), 0)" "vec2(xs, fTexcoord.y), 0.0)")
   gles_fix("int(fTexcoord.y * 192)" "int(fTexcoord.y * 192.0)")
 endif()
+
+# Constant unsigned shifts as numbers (2DCompositorFS: `1u << 4`, `1u << 5`): the 2018 Adreno 5xx driver (LG V30) rejects
+# the shader otherwise. For every shader, so a new one is covered too.
+include(${CMAKE_CURRENT_LIST_DIR}/gles_fold_shifts.cmake)
+gles_fold_const_shifts(text)

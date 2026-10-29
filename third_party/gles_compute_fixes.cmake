@@ -239,3 +239,7 @@ gles_compute_fix("atomicAdd(VariantWorkCount[1].w, VariantWorkCount[gl_GlobalInv
   "atomicAdd(VariantWorkCount[7], VariantWorkCount[gl_GlobalInvocationID.x * 4U + 2U])")
 gles_compute_fix("if (gl_GlobalInvocationID.x < VariantWorkCount[0].w)"
   "if (gl_GlobalInvocationID.x < VariantWorkCount[3])")
+
+# Constant unsigned shifts as numbers: the 2018 Adreno 5xx driver (LG V30) rejects 29 of the 33 shaders otherwise.
+include(${CMAKE_CURRENT_LIST_DIR}/gles_fold_shifts.cmake)
+gles_fold_const_shifts(gpu3d_compute_sh)
