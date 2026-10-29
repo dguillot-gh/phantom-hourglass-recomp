@@ -30,6 +30,13 @@ $sdk = Find-Sdk
 function Need([string] $text) { if ($DryRun) { Step "missing: $text" } else { Fail $text } }
 if (-not $java) { Need "no Java 17: run ANDROID-TOOLS.ps1 (RUN-ANDROID.ps1 runs it first)" }
 if (-not $sdk) { Need "no Android SDK with NDK ${NdkVersion}: run ANDROID-TOOLS.ps1 (RUN-ANDROID.ps1 runs it first)" }
+# (No CMake 3.28+ installed: the newest one in the Android SDK on the drive, e.g. cmake\3.31.6, which travels with it.)
+if (-not (Get-CMakeVersionOk) -and $sdk) {
+    $sdkCmake = @(Get-ChildItem -Path (Join-Path $sdk 'cmake') -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^(\d+)\.(\d+)' -and ([int]$matches[1] -gt 3 -or ([int]$matches[1] -eq 3 -and [int]$matches[2] -ge 28)) } |
+        Sort-Object { [version]($_.Name -replace '[^\d.].*$', '') } -Descending) | Select-Object -First 1
+    if ($sdkCmake) { Add-Path (Join-Path $sdkCmake.FullName 'bin') }
+}
 $cmakeExe = $null; $cmakeVersion = ''; $cmakeDir = ''
 if (Get-CMakeVersionOk) {
     $cmakeExe = (Get-Command cmake).Source
