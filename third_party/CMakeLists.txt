@@ -190,16 +190,18 @@ ffcc_patch(ndscart_src NDSCart.cpp "        delay += ((ROMCnt >> 16) & 0x3F);\n\
   "        delay += ((ROMCnt >> 16) & 0x3F);\n    if (FfccFastCart) { xfercycle = 1; delay = 4; } // ffcc patch\n\n    Parent.NDS.ScheduleEvent(ROMTransferEvent, false, xfercycle * delay, ROMTransfer_ReceiveData, 0);\n")
 ffcc_write_patched(ndscart_src ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/NDSCart.cpp)
 
-# SPI.cpp: instant SPI transfers. The ARM7's SDK code talks to the touchscreen, power and firmware chips over SPI and
-# waits for every byte in a 3-instruction loop on SPICNT's busy bit (`ldrh / tst #0x80 / bne`). Interpreted, that spin
-# was ~28% of all ARM7 instructions in Spirit Tracks gameplay (V30 profile, 2026-10-29: LOW-END-PHONES-LOG.md). The
-# transfer now completes at once (busy never seen) unless the game asked for the transfer-done interrupt, which still
-# comes on time; on hardware the byte takes 64-512 cycles, which the SDK only waits out.
-file(READ ${MS}/SPI.cpp spi_src)
-string(REPLACE "\r\n" "\n" spi_src "${spi_src}")
-ffcc_patch(spi_src SPI.cpp "    // SPI transfers one bit per cycle -> 8 cycles per byte\n    u32 delay = 8 * (8 << (Cnt & 0x3));\n    NDS.ScheduleEvent(Event_SPITransfer, false, delay, 0, 0);\n"
-  "    // ph patch: no transfer-done interrupt wanted: the byte is done now (third_party/CMakeLists.txt)\n    if (!(Cnt & (1<<14)))\n    {\n        Cnt &= ~(1<<7);\n        return;\n    }\n\n    // SPI transfers one bit per cycle -> 8 cycles per byte\n    u32 delay = 8 * (8 << (Cnt & 0x3));\n    NDS.ScheduleEvent(Event_SPITransfer, false, delay, 0, 0);\n")
-ffcc_write_patched(spi_src ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/SPI.cpp)
+# NDS.cpp: SPI busy-waits skipped in time, not run. The ARM7's SDK code waits for every SPI byte (touchscreen, power,
+# firmware chips) in a 3-instruction loop on SPICNT's busy bit (`ldrh / tst #0x80 / bne`). This runtime runs the ARM7
+# to the end of its time slice before events fire, so it spun there until the slice ended (~28% of all ARM7
+# instructions in Spirit Tracks gameplay on the LG V30; LOW-END-PHONES-LOG.md). Now, when the ARM7 reads SPICNT while
+# a transfer is busy, its clock moves on to the moment the transfer ends (at most the end of its slice) and the
+# transfer completes there, interrupt included: the game sees the busy bit clear at the hardware's time, without the
+# spinning. (Completing transfers at once instead broke Spirit Tracks' two-screen 3D: it flickered.)
+file(READ ${MS}/NDS.cpp nds_src)
+string(REPLACE "\r\n" "\n" nds_src "${nds_src}")
+ffcc_patch(nds_src NDS.cpp "    case 0x040001C0: return SPI.ReadCnt();\n"
+  "    case 0x040001C0: // ph patch: a busy SPI transfer: skip the ARM7's clock to its end (third_party/CMakeLists.txt)\n        if (SPI.ReadCnt() & 0x80)\n        {\n            SchedEvent& evt = SchedList[Event_SPITransfer];\n            if (evt.Timestamp > ARM7Timestamp) ARM7Timestamp = evt.Timestamp < ARM7Target ? evt.Timestamp : ARM7Target;\n            if (ARM7Timestamp >= evt.Timestamp)\n            {\n                CancelEvent(Event_SPITransfer);\n                evt.Funcs[evt.FuncID](evt.That, evt.Param);\n            }\n        }\n        return SPI.ReadCnt();\n")
+ffcc_write_patched(nds_src ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/NDS.cpp)
 
 # The compute renderer, also on the phone (ph patch): OpenGL ES 3.2 shaders in GPU3D_Compute.cpp, and its shader header
 # made GLSL ES by gles_compute_fixes.cmake (written beside it, so its #include "GPU3D_Compute_shaders.h" finds that).
@@ -240,8 +242,8 @@ add_library(melonds_core STATIC
   ${MS}/DSi_DSP.cpp ${MS}/DSi_I2C.cpp ${MS}/DSi_I2S.cpp ${MS}/DSi_NAND.cpp ${MS}/DSi_NDMA.cpp ${MS}/DSi_NWifi.cpp
   ${MS}/DSi_SD.cpp ${MS}/DSi_SPI_TSC.cpp ${MS}/FATIO.cpp ${MS}/FATStorage.cpp ${MS}/GBACart.cpp
   ${MS}/GBACartMotionPak.cpp ${MS}/GPU.cpp ${MS}/GPU_Soft.cpp ${MS}/GPU2D.cpp ${MS}/GPU2D_Soft.cpp ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/GPU3D.cpp
-  ${MS}/GPU3D_Soft.cpp ${MS}/GPU3D_Texcache.cpp ${MS}/Mic.cpp ${MS}/NDS.cpp ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/NDSCart.cpp ${MS}/ROMList.cpp
-  ${MS}/FreeBIOS.cpp ${MS}/RTC.cpp ${MS}/Savestate.cpp ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/SPI.cpp ${MS}/SPI_Firmware.cpp ${MS}/SPU.cpp
+  ${MS}/GPU3D_Soft.cpp ${MS}/GPU3D_Texcache.cpp ${MS}/Mic.cpp ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/NDS.cpp ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/NDSCart.cpp ${MS}/ROMList.cpp
+  ${MS}/FreeBIOS.cpp ${MS}/RTC.cpp ${MS}/Savestate.cpp ${MS}/SPI.cpp ${MS}/SPI_Firmware.cpp ${MS}/SPU.cpp
   ${MS}/Utils.cpp ${MS}/Wifi.cpp ${MS}/WifiAP.cpp
   ${MS}/DSP_HLE/UcodeBase.cpp ${MS}/DSP_HLE/AACUcode.cpp ${MS}/DSP_HLE/G711Ucode.cpp ${MS}/DSP_HLE/GraphicsUcode.cpp
   ${MS}/NDSCart/CartCommon.cpp ${MS}/NDSCart/CartRetail.cpp ${MS}/NDSCart/CartRetailNAND.cpp
