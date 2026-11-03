@@ -322,6 +322,16 @@ ffcc_patch(shader_3DRenderFS 3DRenderFS.glsl "vec4 FinalColor()\n{\n" "${ffcc_sm
 ffcc_patch(shader_3DRenderFS 3DRenderFS.glsl "            tcol = vec4(texture(CurTexture, texcoord)) / vec4(63,63,63,31);\n"
   "            tcol = (uSmoothTex == 0) ? (vec4(texture(CurTexture, texcoord)) / vec4(63,63,63,31)) : SmoothTexel(texcoord);\n")
 ffcc_write_patched(shader_3DRenderFS ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/OpenGL_shaders/3DRenderFS.glsl)
+# 3DRenderVS: the DS's "depth equal" test (polygon attribute bit 14) passes within a margin (0x200 in Z-buffer mode, 0xFF
+# in W-buffer mode); melonDS's OpenGL renderer uses plain GL_LEQUAL ("TODO: proper 'equal' depth test!" in
+# GPU3D_OpenGL.cpp), so a coplanar piece a hair behind wins and loses from frame to frame: flicker on objects such as
+# PH's cut grass (user report, 2026-11-03). Moving those polygons toward the camera by the margin lets GL_LEQUAL pass
+# where the DS's test passes. OpenGL renderer only (Compute and software emulate the test exactly).
+file(READ ${MS}/OpenGL_shaders/3DRenderVS.glsl shader_3DRenderVS)
+string(REPLACE "\r\n" "\n" shader_3DRenderVS "${shader_3DRenderVS}")
+ffcc_patch(shader_3DRenderVS 3DRenderVS.glsl "    fpos.z = (float(vPosition.z << zshift) / 8388608.0) - 1.0;\n#endif\n"
+  "    fpos.z = (float(vPosition.z << zshift) / 8388608.0) - 1.0;\n#endif\n    if ((attr & 0x4000) != 0) // ffcc patch: depth-equal margin\n    {\n#ifdef WBuffer\n        fZ -= 255.0 / 16777216.0;\n#else\n        fpos.z -= 1024.0 / 16777216.0;\n#endif\n    }\n")
+ffcc_write_patched(shader_3DRenderVS ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/OpenGL_shaders/3DRenderVS.glsl)
 
 # The phone: OpenGL ES 3.2 copies of all of them (ours where patched above), made by gles_shaders.cmake. PH_GLES_SHADERS
 # builds the PC program with them too (the gles-test preset: NVIDIA's and AMD's drivers take ES shaders), to test the
@@ -341,7 +351,7 @@ set(melonds_shader_headers)
 foreach(sh ${MELONDS_SHADERS})
   set(out ${CMAKE_CURRENT_BINARY_DIR}/melonds_gen/OpenGL_shaders/${sh}.h)
   set(in ${MS}/OpenGL_shaders/${sh}.glsl)
-  if(sh MATCHES "^(2DCompositorVS|2DCompositorFS|2DSpriteVS|FinalPassFS|CaptureFS|3DRenderFS)$")
+  if(sh MATCHES "^(2DCompositorVS|2DCompositorFS|2DSpriteVS|FinalPassFS|CaptureFS|3DRenderVS|3DRenderFS)$")
     set(in ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/OpenGL_shaders/${sh}.glsl)
   endif()
   if(ANDROID OR PH_GLES_SHADERS)
