@@ -217,6 +217,15 @@ ffcc_patch(gpu3d_compute_sh GPU3D_Compute_shaders.h "const std::string ClearCoar
 include(${CMAKE_CURRENT_SOURCE_DIR}/gles_compute_fixes.cmake)  # (the GLSL ES fixes, for the phone)
 ffcc_write_patched(gpu3d_compute_sh ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/GPU3D_Compute_shaders.h)
 
+# GPU.cpp: the constructor's SetRenderer() syncs VRAM captures for the *old* renderer before any is set, and
+# VRAMCaptureBlockFlags is not cleared until Reset(). Leftover heap bytes in it made that call go through a null Rend:
+# SIGSEGV at start on some launches (LG V30 OpenGL, tombstone 2026-11-03). No renderer = nothing to sync.
+file(READ ${MS}/GPU.cpp gpu_src)
+string(REPLACE "\r\n" "\n" gpu_src "${gpu_src}")
+ffcc_patch(gpu_src GPU.cpp "void GPU::SyncAllVRAMCaptures()\n{\n"
+  "void GPU::SyncAllVRAMCaptures()\n{\n    if (!Rend) return; // ffcc patch: called from the constructor before a renderer exists\n")
+ffcc_write_patched(gpu_src ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/GPU.cpp)
+
 set(melonDS_HOMEPAGE_URL "https://melonds.kuribo64.net")
 set(melonDS_VERSION "1.1")
 set(MELONDS_VERSION_SUFFIX "-ffcc")
@@ -228,7 +237,7 @@ add_library(melonds_core STATIC
   ${MS}/CRC32.cpp ${MS}/DMA.cpp ${MS}/DMA_Timings.cpp ${MS}/DSi.cpp ${MS}/DSi_AES.cpp ${MS}/DSi_Camera.cpp
   ${MS}/DSi_DSP.cpp ${MS}/DSi_I2C.cpp ${MS}/DSi_I2S.cpp ${MS}/DSi_NAND.cpp ${MS}/DSi_NDMA.cpp ${MS}/DSi_NWifi.cpp
   ${MS}/DSi_SD.cpp ${MS}/DSi_SPI_TSC.cpp ${MS}/FATIO.cpp ${MS}/FATStorage.cpp ${MS}/GBACart.cpp
-  ${MS}/GBACartMotionPak.cpp ${MS}/GPU.cpp ${MS}/GPU_Soft.cpp ${MS}/GPU2D.cpp ${MS}/GPU2D_Soft.cpp ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/GPU3D.cpp
+  ${MS}/GBACartMotionPak.cpp ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/GPU.cpp ${MS}/GPU_Soft.cpp ${MS}/GPU2D.cpp ${MS}/GPU2D_Soft.cpp ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/GPU3D.cpp
   ${MS}/GPU3D_Soft.cpp ${MS}/GPU3D_Texcache.cpp ${MS}/Mic.cpp ${MS}/NDS.cpp ${CMAKE_CURRENT_BINARY_DIR}/melonds_patched/NDSCart.cpp ${MS}/ROMList.cpp
   ${MS}/FreeBIOS.cpp ${MS}/RTC.cpp ${MS}/Savestate.cpp ${MS}/SPI.cpp ${MS}/SPI_Firmware.cpp ${MS}/SPU.cpp
   ${MS}/Utils.cpp ${MS}/Wifi.cpp ${MS}/WifiAP.cpp
