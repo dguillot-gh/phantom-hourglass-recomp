@@ -152,20 +152,28 @@ final class PhMenu {
                     ? "Compute is unavailable on this phone; the standard GPU renderer is drawing the game."
                     : "Compute draws the game at higher resolution with accurate 3D. OpenGL is much faster on older "
                         + "phones, but some 3D can flicker. Software uses the DS's native picture."));
-        chips(list, new String[] {"Software", "OpenGL", "Compute"}, software ? 0 : opengl ? 1 : 2, i -> {
+        final int current = software ? 0 : opengl ? 1 : 2;
+        chips(list, new String[] {"Software", "OpenGL", "Compute"}, current, i -> {
+            if (i == current) return;
             final boolean useHardware = i > 0;
             final boolean useCompute = i == 2;
             final int newScale = Math.min(4, prefs.getInt("scale", 2));
             prefs.edit().putBoolean("gpu", useHardware).putBoolean("compute", useCompute)
                     .putInt("scale", newScale).apply();
-            PhInput.nativeSetCompute(useCompute);
-            PhInput.nativeSetVideo(useHardware, useHardware ? newScale : 1);
-            final int wideMode = useHardware && prefs.getBoolean("wide", false)
-                    ? Math.max(1, Math.min(2, prefs.getInt("wide_mode", 1))) : 0;
-            PhInput.nativeSetWide(wideMode);
-            pad.setWide(wideMode);
+            if (useHardware) {
+                // A GPU renderer made in a running game can fail on some drivers (LG V30, Adreno 540: "Output oFlags
+                // location ... exceeds max allowed" at link, 2026-11-03), and the game then falls back to software
+                // for the rest of the run. At launch it starts fine: continue from here in a fresh game.
+                close();
+                activity.restartWithResume();
+                return;
+            }
+            PhInput.nativeSetCompute(false);
+            PhInput.nativeSetVideo(false, 1);
+            PhInput.nativeSetWide(0);
+            pad.setWide(0);
             refresh();
-        }, new boolean[] {true, !graphicsFailed, !graphicsFailed && !computeFailed});
+        }, new boolean[] {true, true, true});  // (each GPU choice restarts, so a failed start this run is no reason to grey it)
         list.addView(label("Internal resolution", hardware ? "Higher resolution; up to 4× on Android."
                 : "Software runs at the DS's native resolution."));
         // (Compute is capped at 4× on Android.)
@@ -203,7 +211,13 @@ final class PhMenu {
         list.addView(label("Widescreen", "With OpenGL or Compute, shows more of the world at the sides. Some objects may appear late at the edges."));
         chips(list, new String[] {"4:3", "16:9", "21:9"}, wideMode, i -> {
             final int mode = wideAvailable ? i : 0;
+            if (mode == wideMode) return;
             prefs.edit().putBoolean("wide", mode != 0).putInt("wide_mode", mode == 0 ? 1 : mode).apply();
+            if (wideAvailable) {  // a new width makes a new GPU renderer: same as a renderer change (above)
+                close();
+                activity.restartWithResume();
+                return;
+            }
             PhInput.nativeSetWide(mode);
             pad.setWide(mode);
             refresh();

@@ -54,6 +54,30 @@ public final class LauncherActivity extends Activity {
     /** The resume state the game writes when it quits or goes to the background (frontend main.cpp). */
     private File resume(String ext) { return new File(getFilesDir(), "states/resume." + ext); }
 
+    /** Intent extra from the game (GameActivity.restartWithResume): continue it again at once, in a fresh process. */
+    static final String EXTRA_RELAUNCH = "relaunch";
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+    }
+
+    /** Continue, once the old game process has exited (SDL's native side starts once per process), or after 4 s. */
+    private void relaunchWhenGameGone(long until) {
+        boolean alive = false;
+        final android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(ACTIVITY_SERVICE);
+        final java.util.List<android.app.ActivityManager.RunningAppProcessInfo> procs = am.getRunningAppProcesses();
+        if (procs != null)
+            for (android.app.ActivityManager.RunningAppProcessInfo p : procs)
+                if (p.processName.equals(getPackageName() + ":game")) alive = true;
+        if (alive && System.currentTimeMillis() < until) {
+            getWindow().getDecorView().postDelayed(() -> relaunchWhenGameGone(until), 100);
+            return;
+        }
+        startActivity(new Intent(this, GameActivity.class).putExtra(GameActivity.EXTRA_CONTINUE, true));
+    }
+
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -125,6 +149,10 @@ public final class LauncherActivity extends Activity {
     protected void onResume() {
         super.onResume();
         refresh();
+        if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_RELAUNCH, false)) {
+            getIntent().removeExtra(EXTRA_RELAUNCH);
+            if (resume("state").isFile()) relaunchWhenGameGone(System.currentTimeMillis() + 4000);
+        }
     }
 
     private void refresh() {

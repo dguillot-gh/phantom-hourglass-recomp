@@ -1,6 +1,7 @@
 package com.phrecomp.ph;
 
 import android.app.AlertDialog;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.os.Build;
@@ -159,6 +160,20 @@ public class GameActivity extends SDLActivity {
 
     /** Quit: the resume state first (Continue on the start screen), waiting for it up to a few seconds. */
     private void quitWithResume() {
+        quitWithResume(this::finish);
+    }
+
+    /** A video change that needs a fresh game (a GPU renderer or width): the resume state, then this process ends
+     *  and the start screen continues from it at once, with the new settings. */
+    void restartWithResume() {
+        quitWithResume(() -> {
+            startActivity(new Intent(this, LauncherActivity.class).putExtra(LauncherActivity.EXTRA_RELAUNCH, true)
+                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));
+            finish();
+        });
+    }
+
+    private void quitWithResume(Runnable then) {
         PhInput.nativeRequestResume();
         new Thread(() -> {
             final long until = System.currentTimeMillis() + 6000;
@@ -169,7 +184,7 @@ public class GameActivity extends SDLActivity {
                     break;
                 }
             }
-            runOnUiThread(this::finish);
+            runOnUiThread(then);
         }).start();
     }
 
