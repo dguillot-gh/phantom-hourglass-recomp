@@ -69,11 +69,32 @@ and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melo
 
 ## Tested on
 
-- **Phone:** Google Pixel 8. Other phones should work (Android 8 or newer, 64-bit ARM) but have not been tried, and GPU
-  drivers differ: if the picture looks wrong, the software renderer (1x, in the menu) is the safe fallback.
+- **Phones:** two test phones, a high-end one and a 2017 one:
+  - **Google Pixel 8** (Tensor G3, Mali-G715, Android 14+)
+  - **LG V30** (Snapdragon 835, Adreno 540, Android 8, rooted for measuring)
+
+  Other phones should work (Android 8 or newer, 64-bit ARM), but GPU drivers differ: if the picture looks wrong, the
+  software renderer (1x, in the menu) is the safe fallback.
 - **PC:** Windows 11.
-- **Status:** plays on PC and on the Pixel 8. A short Pixel 8 check with Compute at 2x reached 59.9 fps, near the
-  game's 59.83 fps target. Longer sessions and 4x performance have not been characterized across devices.
+- **Status:** plays on PC, the Pixel 8 and the LG V30.
+- **Measured** (2026-11-03, 60 s at the same spot in gameplay, with the `phoneperf` tool):
+
+  | Phone | Renderer | fps | 1% low | Notes |
+  |---|---|---:|---:|---|
+  | LG V30 | **OpenGL 4x** | **59.8** | 31 | repeated twice, same result |
+  | LG V30 | OpenGL 2x | 42.9 | 17 | slower than 4x: see below |
+  | LG V30 | Compute 4x | 17.5 | 6 | |
+  | LG V30 | Software | 35.7 | 16 | |
+  | Pixel 8 | OpenGL 4x | 59.8 | | short check, the game's own fps log |
+  | Pixel 8 | Compute 2x | 59.9 | | short check (earlier) |
+
+  **Best settings:** **OpenGL 4x** on older phones like the V30; **Compute** (the more exact renderer) on fast phones
+  like the Pixel 8. On the V30, 4x runs faster than 2x: the heavier load makes the phone raise its CPU and GPU clocks
+  (fast cores ~1.7 GHz and the GPU at 710 MHz at 4x, against ~1.2 GHz and 257 MHz at 2x).
+- **OpenGL on phones** (2026-11-03): OpenGL is a menu choice next to Software and Compute. Fixed on the way:
+  flickering cut grass (melonDS's OpenGL renderer approximated the DS's "equal depth" test), a rare crash at start, and
+  OpenGL failing to start in a running game on the V30. Changing to OpenGL or Compute, or the widescreen mode, now
+  restarts the game at the same spot.
 - Play tested up until the Fire Temple (which prompted a fix for using the microphone to essentially finish the rest of the game). Some boss fights do require you to swap or rotate screens in order for you to complete them properly. a small price to pay for having this game portable. 90% can be played on a single screen. 
 
 ## What you need
