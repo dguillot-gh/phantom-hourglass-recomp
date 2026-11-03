@@ -36,14 +36,14 @@ public class GameActivity extends SDLActivity {
     protected String[] getArguments() {
         final File files = getFilesDir();
         final SharedPreferences prefs = getSharedPreferences(DsPad.PREFS, MODE_PRIVATE);
-        // Android offers Software or Compute. Migrate the old classic-GPU selection to Compute, while preserving
-        // Software choices from existing installs.
+        // Android offers Software, OpenGL or Compute ("gpu" = hardware, "compute" = Compute when hardware). Earlier
+        // builds kept "compute" equal to "gpu" at every launch, so existing installs keep the renderer they had.
         final boolean hardware = prefs.getBoolean("gpu", true);
-        prefs.edit().putBoolean("compute", hardware).apply();
+        final boolean compute = hardware && prefs.getBoolean("compute", true);
         final java.util.ArrayList<String> args = new java.util.ArrayList<>(java.util.Arrays.asList(
                 new File(files, "rom/azee.nds").getAbsolutePath(),
                 "--data-dir", files.getAbsolutePath(),
-                "--renderer", hardware ? "compute" : "software",
+                "--renderer", compute ? "compute" : hardware ? "gpu" : "software",
                 "--scale", String.valueOf(hardware ? Math.min(4, prefs.getInt("scale", 2)) : 1)));
         if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_CONTINUE, false)) args.add("--continue");
         if (getIntent() != null && getIntent().getBooleanExtra("fps_probe", false)) args.add("--fps-probe");

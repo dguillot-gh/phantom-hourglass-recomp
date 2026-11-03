@@ -973,7 +973,8 @@ int main(int argc, char** argv) {
     else if (textures_arg == "smooth") settings.textures = 1;
     else if (textures_arg == "sharp") settings.textures = 2;
     if (fixes_arg >= 0 && fixes_arg <= 3) settings.fixes = fixes_arg;
-    if (renderer_arg == "gpu") settings.gpu = true, settings.compute = false;
+    // "opengl" = "gpu" (melonDS's OpenGL renderer), the name ST and phoneperf use.
+    if (renderer_arg == "gpu" || renderer_arg == "opengl") settings.gpu = true, settings.compute = false;
     else if (renderer_arg == "compute") settings.gpu = settings.compute = true;
     else if (renderer_arg == "software") settings.gpu = false;
     if (std::find(std::begin(kScales), std::end(kScales), scale_arg) != std::end(kScales)) settings.scale = scale_arg;

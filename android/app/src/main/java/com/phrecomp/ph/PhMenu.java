@@ -137,32 +137,36 @@ final class PhMenu {
                     prefs.edit().putBoolean("fps", on).apply();
                     activity.setFpsShown(on);
                 });
-        // Compute is the Android renderer. If a driver's compute feature is missing, the runtime falls back to
-        // OpenGL automatically; if graphics cannot start at all, it falls back to software.
+        // Software, OpenGL (melonDS's OpenGL renderer: much faster on weak phones such as the LG V30, but its 3D can
+        // flicker in some scenes) or Compute (accurate). If a driver's compute feature is missing, the runtime falls
+        // back to OpenGL automatically; if graphics cannot start at all, it falls back to software.
         final boolean graphicsFailed = PhInput.nativeGpuFailed();
         final boolean computeFailed = !graphicsFailed && PhInput.nativeComputeFailed();
         final boolean hardware = prefs.getBoolean("gpu", true) && !graphicsFailed;
         final boolean software = !hardware;
+        final boolean opengl = hardware && (computeFailed || !prefs.getBoolean("compute", true));
         final int scale = Math.min(4, prefs.getInt("scale", 2));
         list.addView(label("Renderer", graphicsFailed
                 ? "Hardware rendering could not start; the DS software renderer is active."
                 : computeFailed
                     ? "Compute is unavailable on this phone; the standard GPU renderer is drawing the game."
-                    : "Compute draws the game at higher resolution with accurate 3D; Software uses the DS's native picture."));
-        chips(list, new String[] {"Software", "Compute"}, software ? 0 : 1, i -> {
-            final boolean useCompute = i == 1;
+                    : "Compute draws the game at higher resolution with accurate 3D. OpenGL is much faster on older "
+                        + "phones, but some 3D can flicker. Software uses the DS's native picture."));
+        chips(list, new String[] {"Software", "OpenGL", "Compute"}, software ? 0 : opengl ? 1 : 2, i -> {
+            final boolean useHardware = i > 0;
+            final boolean useCompute = i == 2;
             final int newScale = Math.min(4, prefs.getInt("scale", 2));
-            prefs.edit().putBoolean("gpu", useCompute).putBoolean("compute", useCompute)
+            prefs.edit().putBoolean("gpu", useHardware).putBoolean("compute", useCompute)
                     .putInt("scale", newScale).apply();
             PhInput.nativeSetCompute(useCompute);
-            PhInput.nativeSetVideo(useCompute, useCompute ? newScale : 1);
-            final int wideMode = useCompute && prefs.getBoolean("wide", false)
+            PhInput.nativeSetVideo(useHardware, useHardware ? newScale : 1);
+            final int wideMode = useHardware && prefs.getBoolean("wide", false)
                     ? Math.max(1, Math.min(2, prefs.getInt("wide_mode", 1))) : 0;
             PhInput.nativeSetWide(wideMode);
             pad.setWide(wideMode);
             refresh();
-        }, new boolean[] {true, !graphicsFailed});
-        list.addView(label("Internal resolution", hardware ? "Compute resolution; up to 4× on Android."
+        }, new boolean[] {true, !graphicsFailed, !graphicsFailed && !computeFailed});
+        list.addView(label("Internal resolution", hardware ? "Higher resolution; up to 4× on Android."
                 : "Software runs at the DS's native resolution."));
         // (Compute is capped at 4× on Android.)
         final int[] scales = {1, 2, 4};
@@ -174,9 +178,9 @@ final class PhMenu {
             PhInput.nativeSetVideo(true, scales[i]);
             refresh();
         }, new boolean[] {software, hardware, hardware});
-        if (computeFailed) {
-            list.addView(label("3D textures", "Compute is unavailable, so the standard GPU renderer is active. Pixels keeps "
-                    + "the DS's blocky texels; Smooth blends them; Sharp keeps them crisp with soft edges between."));
+        if (opengl) {
+            list.addView(label("3D textures", (computeFailed ? "Compute is unavailable, so the standard GPU renderer is active. "
+                    : "") + "Pixels keeps the DS's blocky texels; Smooth blends them; Sharp keeps them crisp with soft edges between."));
             final int textures = Math.max(0, Math.min(2, prefs.getInt("textures", 0)));
             chips(list, new String[] {"Pixels", "Smooth", "Sharp"}, textures, i -> {
                 prefs.edit().putInt("textures", i).apply();
@@ -196,7 +200,7 @@ final class PhMenu {
         section(list, "Controls");
         final boolean wideAvailable = prefs.getBoolean("gpu", true) && !PhInput.nativeGpuFailed();
         final int wideMode = prefs.getBoolean("wide", false) ? Math.max(1, Math.min(2, prefs.getInt("wide_mode", 1))) : 0;
-        list.addView(label("Widescreen", "With Compute, shows more of the world at the sides. Some objects may appear late at the edges."));
+        list.addView(label("Widescreen", "With OpenGL or Compute, shows more of the world at the sides. Some objects may appear late at the edges."));
         chips(list, new String[] {"4:3", "16:9", "21:9"}, wideMode, i -> {
             final int mode = wideAvailable ? i : 0;
             prefs.edit().putBoolean("wide", mode != 0).putInt("wide_mode", mode == 0 ? 1 : mode).apply();
