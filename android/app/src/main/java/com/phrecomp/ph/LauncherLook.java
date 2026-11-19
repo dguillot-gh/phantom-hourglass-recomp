@@ -204,6 +204,14 @@ final class LauncherLook {
 
     // ---- settings (the ones every DS port reads at start; the in-game menu has the rest) ----
 
+    private static final String[] LANG_VALUES = {"auto", "en", "fr", "es"};
+    private static final String[] LANG_LABELS = {"Auto (system)", "English", "Français", "Español"};
+
+    private static int langIndex(String code) {
+        for (int i = 0; i < LANG_VALUES.length; i++) if (LANG_VALUES[i].equals(code)) return i;
+        return 0;
+    }
+
     /** "GPU · 2× · smooth" from the game's settings. */
     static String summary(SharedPreferences p, boolean gpuDefault) {
         boolean gpu = p.getBoolean("gpu", gpuDefault);
@@ -212,6 +220,8 @@ final class LauncherLook {
         if (p.getBoolean("smooth", false)) b.append(" · smooth");
         if (p.getBoolean("stretch", false)) b.append(" · stretched");
         b.append(p.getBoolean("portrait", false) ? " · upright" : " · sideways");
+        String lang = p.getString("language", "auto");
+        if (!"auto".equals(lang)) b.append(" · ").append(lang.toUpperCase(java.util.Locale.US));
         return b.toString();
     }
 
@@ -219,16 +229,18 @@ final class LauncherLook {
     void settings(SharedPreferences p, boolean gpuDefault, Runnable changed) {
         final boolean gpu = p.getBoolean("gpu", gpuDefault);
         final int scale = Math.max(1, Math.min(4, p.getInt("scale", 2)));
+        final int lang = langIndex(p.getString("language", "auto"));
         String[] items = {
                 "Renderer: " + (gpu ? "GPU" : "Software"),
                 "Resolution: " + scale + "×" + (gpu ? "" : " (GPU only)"),
+                "Language: " + LANG_LABELS[lang],
                 (p.getBoolean("smooth", false) ? "✓ " : "   ") + "Smooth picture",
                 (p.getBoolean("stretch", false) ? "✓ " : "   ") + "Stretch to fill the screen",
                 (p.getBoolean("portrait", false) ? "✓ " : "   ") + "Hold the phone upright (both screens stacked)",
                 "Choose background image…",
                 hasCustomBackground() ? "Use the game's cover again" : null,
         };
-        int n = items[6] == null ? 6 : 7;
+        int n = items[7] == null ? 7 : 8;
         String[] shown = java.util.Arrays.copyOf(items, n);
         dialog().setTitle("Settings").setItems(shown, (d, w) -> {
             switch (w) {
@@ -243,11 +255,20 @@ final class LauncherLook {
                     }).setNegativeButton("Back", null).show();
                     return;
                 }
-                case 2: p.edit().putBoolean("smooth", !p.getBoolean("smooth", false)).apply(); break;
-                case 3: p.edit().putBoolean("stretch", !p.getBoolean("stretch", false)).apply(); break;
-                case 4: p.edit().putBoolean("portrait", !p.getBoolean("portrait", false)).apply(); break;
-                case 5: pickBackground(); return;
-                case 6: clearBackground(); changed.run(); return;
+                case 2: {
+                    dialog().setTitle("Language").setSingleChoiceItems(LANG_LABELS, lang, (x, which) -> {
+                        x.dismiss();
+                        p.edit().putString("language", LANG_VALUES[which]).apply();
+                        changed.run();
+                        settings(p, gpuDefault, changed);
+                    }).setNegativeButton("Back", null).show();
+                    return;
+                }
+                case 3: p.edit().putBoolean("smooth", !p.getBoolean("smooth", false)).apply(); break;
+                case 4: p.edit().putBoolean("stretch", !p.getBoolean("stretch", false)).apply(); break;
+                case 5: p.edit().putBoolean("portrait", !p.getBoolean("portrait", false)).apply(); break;
+                case 6: pickBackground(); return;
+                case 7: clearBackground(); changed.run(); return;
                 default: return;
             }
             changed.run();

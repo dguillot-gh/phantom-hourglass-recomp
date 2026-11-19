@@ -200,6 +200,15 @@ final class PhMenu {
         states(list);
 
         section(list, "Game");
+        list.addView(label("Language", "Takes effect next time you start from the title screen (not Continue)."));
+        final String[] langValues = {"auto", "en", "fr", "es"};
+        final String langNow = prefs.getString("language", "auto");
+        int langChosen = 0;
+        for (int i = 0; i < langValues.length; i++) if (langValues[i].equals(langNow)) langChosen = i;
+        chips(list, new String[] {"Auto", "EN", "FR", "ES"}, langChosen, i -> {
+            prefs.edit().putString("language", langValues[i]).apply();
+            refresh();
+        }, null);
         row(list, "Quit the game", () -> {
             close();
             activity.onBackPressed();

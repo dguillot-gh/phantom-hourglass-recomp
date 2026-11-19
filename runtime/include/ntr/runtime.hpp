@@ -120,7 +120,7 @@ struct RuntimeOptions {
     // Speed-ups (set_fast_cart, set_cpu_speed) at start.
     bool fast_cart = true;
     int cpu_speed = 4;
-    uint8_t language = 1;      // the firmware's language, which the game plays in: 0 Japanese, 1 English, 2 French, 3 German, 5 Spanish
+    uint8_t language = 1;      // the firmware's language, which the game plays in: 0 Japanese, 1 English, 2 French, 3 German, 4 Italian, 5 Spanish
     std::string console_name;  // the console's name (its firmware nickname, up to 10 characters, UTF-8; empty: melonDS's)
     // Builds with FFCC_TRACE_ENTRY only: write each function's first/last frame and call count here on exit.
     std::string profile_path;

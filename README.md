@@ -35,6 +35,8 @@ and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melo
   landscape layouts.
 - **Save and resume**: 12 save-state slots with screenshots, separate from the game's own `.sav` save. Continue resumes
   after quitting or returning from the phone background; existing game saves remain in place.
+- **Language selector**: choose Auto (system locale), English, French, or Spanish from the PC menu, Android settings,
+  `settings.ini`, or `--language` (takes effect on next launch from the title screen).
 - **Convenience features**: FPS counter, side menus on both platforms, PC fullscreen and screenshots, and fast-forward.
 
 ## Pictures
