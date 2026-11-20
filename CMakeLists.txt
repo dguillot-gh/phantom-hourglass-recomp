@@ -16,7 +16,7 @@ else()
 endif()
 
 # Path to the user's own ROM. Only needed for steps that generate code from it (dev mode).
-set(PH_ROM "" CACHE FILEPATH "Path to your own Phantom Hourglass (USA) dump: the game is recompiled from it")
+set(PH_ROM "" CACHE FILEPATH "Path to your own Phantom Hourglass (USA or Europe) dump: the game is recompiled from it")
 
 # A build for a release package (tools/package.py): no path of the build machine ends up in the binary or its debug info.
 option(FFCC_PACKAGE "Build for a release package" OFF)

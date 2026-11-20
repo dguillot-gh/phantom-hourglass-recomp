@@ -3,16 +3,17 @@
 # game (ph_game.dll) and the program (PhantomHourglass.exe) are compiled. The first build also downloads SDL3.
 # -GenerateOnly makes only the C (the recompiler and its output), what the Android build needs: no PC game or program
 # (the build PC, scripts\ci-build.ps1).
-#   powershell -NoProfile -ExecutionPolicy Bypass -File 2-BUILD.ps1 [-Clean] [-Jobs N] [-GenerateOnly] [-DryRun]
+#   powershell -NoProfile -ExecutionPolicy Bypass -File 2-BUILD.ps1 [-Clean] [-Jobs N] [-GenerateOnly] [-Region usa|eur] [-Rom <path>] [-DryRun]
 [CmdletBinding()]
-param([switch] $Clean, [int] $Jobs = 0, [switch] $GenerateOnly, [switch] $DryRun)
+param([switch] $Clean, [int] $Jobs = 0, [switch] $GenerateOnly, [string] $Region = '', [string] $Rom = '', [switch] $DryRun)
 . (Join-Path $PSScriptRoot 'ph-common.ps1')
 
-$rom = Find-Rom
+$rom = Find-Rom -RomPath $Rom -Region $Region
+$romCode = Get-RomCode $rom
 
 # The source tree: everything the configure step reads.
 $need = @('CMakeLists.txt', 'CMakePresets.json', 'third_party\CMakeLists.txt', 'frontend\CMakeLists.txt',
-          'frontend\config\azee\functions.txt', 'frontend\config\azee\hooks.txt', 'frontend\config\azee\regions.txt',
+          "frontend\config\$romCode\functions.txt", "frontend\config\$romCode\hooks.txt", "frontend\config\$romCode\regions.txt",
           'frontend\src\main.cpp', 'frontend\src\ph_hooks.cpp', 'frontend\res\app.ico', 'runtime\include\ntr\recomp.h',
           'recompiler\src\main.cpp')
 foreach ($n in $need) { if (-not (Test-Path (Join-Path $Repo $n))) { Fail "missing $Repo\$n" } }

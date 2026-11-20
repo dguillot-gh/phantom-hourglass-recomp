@@ -1,0 +1,5 @@
+# Code regions carried inside one module and copied elsewhere at run time (see docs/RECOMPILER.md).
+# Format: <name> <source_module> <source_addr> <size> <run_addr> [interpret]
+#   interpret: the runtime runs code at <run_addr> on its interpreter while this region is resident (not recompiled).
+#
+# None known for AZEP yet. Code with no recompiled function still runs, on the interpreter fallback.

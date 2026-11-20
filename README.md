@@ -117,6 +117,11 @@ and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melo
   |---|---|
   | Phantom Hourglass (USA) | `4c8f52dd719918bbcd46e73a8bae8628139c1b85` |
   | Phantom Hourglass (USA), D-pad patch | `7e0d26d143992f1eee182b24f1abb9e7f038eacf` |
+  | Phantom Hourglass (Europe) (`En,Fr,De,Es,It`) | `02be55db55cf254bd064d2b3eb368b92a5b4156d` |
+  | Phantom Hourglass (Europe), D-pad patch | `8e3bbda6056c47f06fecf1a06d9f144a19283d88` |
+
+  If both USA and Europe dumps are in `roms\`, pass `-Region eur` (or `-Region usa` / `-Rom <path>`) to `2-BUILD.ps1`,
+  `3-MAKE-GAME-FOLDER.ps1`, `RUN-ALL.ps1`, or `6-INSTALL-PHONE.ps1`.
 
   **Clean or D-pad patch?** In the original game the D-pad does not move Link (the patch is what adds that), so with the
   clean dump the D-pad only does what the game itself uses it for. Turn on the **analog stick** instead (the phone

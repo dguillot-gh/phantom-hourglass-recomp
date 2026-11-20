@@ -43,6 +43,7 @@ bool load_game_module(const std::filesystem::path& path, ntr::GameCode& code, st
         SDL_UnloadObject(lib);
         return false;
     }
+    code.game_code = info->game_code ? info->game_code : "";
     code.functions = info->functions;
     code.function_count = info->function_count;
     code.overlays = info->overlays;

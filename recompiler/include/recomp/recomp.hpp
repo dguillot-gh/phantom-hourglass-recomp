@@ -67,6 +67,7 @@ struct Config {
 };
 
 struct Program {
+    std::string game_code;
     std::vector<Module> modules;  // indexed by position; use find_module() for ids
     Config config;
 

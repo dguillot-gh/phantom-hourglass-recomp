@@ -16,6 +16,7 @@ namespace ntr {
 
 // Recompiled code tables (from the generated func_table.c).
 struct GameCode {
+    std::string game_code;
     const NtrFuncEntry* functions = nullptr;
     size_t function_count = 0;
     const NtrOverlayInfo* overlays = nullptr;

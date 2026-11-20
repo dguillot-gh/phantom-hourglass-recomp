@@ -1,5 +1,18 @@
 # Phantom Hourglass: the recompiled game (ph_game, from the player's ROM) and the program (PhantomHourglass).
-set(PH_CONFIG ${CMAKE_CURRENT_SOURCE_DIR}/config/azee)
+# Pick the per-region recompiler config from the ROM's 4-byte game code at offset 0x0C (AZEE = USA, AZEP = Europe).
+set(PH_CONFIG_CODE "azee")
+if(PH_ROM AND EXISTS "${PH_ROM}")
+  file(READ "${PH_ROM}" PH_ROM_CODE_HEX OFFSET 12 LIMIT 4 HEX)
+  if(PH_ROM_CODE_HEX STREQUAL "415a4550")      # AZEP (Europe)
+    set(PH_CONFIG_CODE "azep")
+  elseif(PH_ROM_CODE_HEX STREQUAL "415a4545")  # AZEE (USA)
+    set(PH_CONFIG_CODE "azee")
+  endif()
+endif()
+set(PH_CONFIG ${CMAKE_CURRENT_SOURCE_DIR}/config/${PH_CONFIG_CODE})
+if(PH_ROM)
+  message(STATUS "Phantom Hourglass config: ${PH_CONFIG_CODE} (${PH_CONFIG})")
+endif()
 
 # ---- Android: the game's C comes from a PC build (recomp_generated), compiled here for the phone ----
 if(ANDROID)

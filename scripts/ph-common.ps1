@@ -67,23 +67,74 @@ function Run-Optional([string] $what, [scriptblock] $cmd) {
     return ($code -eq 0)
 }
 
-# ---- the ROM: the clean USA dump if present, else the D-pad patched one (both supported, one config) ----------------
+# ---- the ROM: USA or Europe (clean or D-pad patch) ------------------------------------------------------------------
 $KnownRoms = @{
     '4c8f52dd719918bbcd46e73a8bae8628139c1b85' = 'USA (clean)'
     '7e0d26d143992f1eee182b24f1abb9e7f038eacf' = 'USA (D-pad patch)'
+    '02be55db55cf254bd064d2b3eb368b92a5b4156d' = 'Europe (clean)'
+    '8e3bbda6056c47f06fecf1a06d9f144a19283d88' = 'Europe (D-pad patch)'
 }
-function Find-Rom {
+$KnownRomCodes = @{
+    '4c8f52dd719918bbcd46e73a8bae8628139c1b85' = 'azee'
+    '7e0d26d143992f1eee182b24f1abb9e7f038eacf' = 'azee'
+    '02be55db55cf254bd064d2b3eb368b92a5b4156d' = 'azep'
+    '8e3bbda6056c47f06fecf1a06d9f144a19283d88' = 'azep'
+}
+function Get-RomCode([string] $path) {
+    $h = (Get-FileHash -Algorithm SHA1 -LiteralPath $path).Hash.ToLower()
+    if ($KnownRomCodes.ContainsKey($h)) { return $KnownRomCodes[$h] }
+    return 'azee'
+}
+function Find-Rom([string] $RomPath = '', [string] $Region = '') {
+    if (-not $RomPath -and $env:PH_ROM) { $RomPath = $env:PH_ROM }
+    if (-not $Region -and $env:PH_REGION) { $Region = $env:PH_REGION }
+    if ($RomPath) {
+        if (-not (Test-Path -LiteralPath $RomPath)) { Fail "ROM not found: $RomPath" }
+        $h = (Get-FileHash -Algorithm SHA1 -LiteralPath $RomPath).Hash.ToLower()
+        if (-not $KnownRoms.ContainsKey($h)) { Fail "unsupported Phantom Hourglass ROM: $RomPath (sha1 $h)" }
+        Step "ROM: $RomPath ($($KnownRoms[$h]))"
+        return (Resolve-Path -LiteralPath $RomPath).Path
+    }
+    $wantCode = ''
+    if ($Region) {
+        switch ($Region.ToLower()) {
+            'usa'  { $wantCode = 'azee' }
+            'us'   { $wantCode = 'azee' }
+            'azee' { $wantCode = 'azee' }
+            'eur'  { $wantCode = 'azep' }
+            'eu'   { $wantCode = 'azep' }
+            'europe' { $wantCode = 'azep' }
+            'azep' { $wantCode = 'azep' }
+            default { Fail "unknown -Region '$Region' (expected usa or eur)" }
+        }
+    }
+    $priority = @{ 'USA (clean)' = 4; 'Europe (clean)' = 3; 'USA (D-pad patch)' = 2; 'Europe (D-pad patch)' = 1 }
     $found = ''
+    $foundScore = -1
+    $others = @()
     $candidates = @(Get-ChildItem -Path $Root, $RomsDir, $RomDir -Filter '*.nds' -File -ErrorAction SilentlyContinue)
     foreach ($c in $candidates) {
         $h = (Get-FileHash -Algorithm SHA1 -LiteralPath $c.FullName).Hash.ToLower()
-        if ($KnownRoms.ContainsKey($h)) {
-            if (-not $found -or $KnownRoms[$h] -eq 'USA (clean)') { $found = $c.FullName }
+        if (-not $KnownRoms.ContainsKey($h)) { continue }
+        if ($wantCode -and $KnownRomCodes[$h] -ne $wantCode) { continue }
+        $score = $priority[$KnownRoms[$h]]
+        if ($score -gt $foundScore) {
+            if ($found) { $others += $found }
+            $found = $c.FullName
+            $foundScore = $score
+        } else {
+            $others += $c.FullName
         }
     }
-    if (-not $found) { Fail "no supported Phantom Hourglass ROM found in $Root or $RomDir" }
+    if (-not $found) {
+        $hint = if ($Region) { " matching region '$Region'" } else { '' }
+        Fail "no supported Phantom Hourglass ROM$hint found in $Root or $RomsDir"
+    }
     $h = (Get-FileHash -Algorithm SHA1 -LiteralPath $found).Hash.ToLower()
     Step "ROM: $found ($($KnownRoms[$h]))"
+    if ($others.Count -gt 0 -and -not $Region) {
+        Step "other supported ROM(s) also present (pass -Region eur / -Region usa or -Rom <path> to pick another)"
+    }
     return $found
 }
 

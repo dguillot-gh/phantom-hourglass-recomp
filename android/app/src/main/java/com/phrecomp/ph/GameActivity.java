@@ -43,6 +43,7 @@ public class GameActivity extends SDLActivity {
         final boolean compute = hardware && prefs.getBoolean("compute", true);
         final java.util.ArrayList<String> args = new java.util.ArrayList<>(java.util.Arrays.asList(
                 new File(files, "rom/azee.nds").getAbsolutePath(),
+                "--save-file", new File(files, "saves/azee.sav").getAbsolutePath(),
                 "--data-dir", files.getAbsolutePath(),
                 "--renderer", compute ? "compute" : hardware ? "gpu" : "software",
                 "--scale", String.valueOf(hardware ? Math.min(4, prefs.getInt("scale", 2)) : 1)));

@@ -10,7 +10,7 @@
 namespace ph {
 namespace {
 
-// AZEE (USA), zeldaret/ph config/usa/arm9/symbols.txt: PlayerControl* gPlayerControl (DTCM).
+// AZEE (USA) and AZEP (Europe), zeldaret/ph config/{usa,eur}/arm9/dtcm/symbols.txt: PlayerControl* gPlayerControl.
 constexpr uint32_t kPlayerControl = 0x027E0FB8;
 // PlayerControl's fields (include/Player/PlayerControl.hpp, TouchControl.hpp).
 constexpr uint32_t kTouchX = 0x10, kTouchY = 0x14;  // s32, DS pixels
