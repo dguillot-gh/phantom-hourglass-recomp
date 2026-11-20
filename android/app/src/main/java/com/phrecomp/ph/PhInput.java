@@ -28,6 +28,9 @@ public final class PhInput {
     /** The picture filter: smooth (on) or sharp pixels (off). */
     public static native void nativeSetSmooth(boolean on);
 
+    /** Render dialogue text with a smooth vector font at screen resolution. */
+    public static native void nativeSetHdText(boolean on);
+
     /** The FPS counter in the corner of the picture. */
     public static native void nativeSetFps(boolean on);
 

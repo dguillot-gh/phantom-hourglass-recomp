@@ -1,10 +1,13 @@
 #include "gl_present.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 
 #include "font8x8_basic.h"
 #include "frontend/glad/glad.h"  // (melonDS's GL loader, which the runtime's GPU renderer uses too)
+#include "stb_truetype.h"
 #if defined(__ANDROID__) || defined(PH_GLES_TEST)
 #include "gles_compat.hpp"
 #endif
@@ -190,6 +193,10 @@ void GlPresenter::shutdown() {
     glDeleteTextures(1, &soft_tex_);
     glDeleteTextures(1, &thumb_tex_);
     glDeleteTextures(1, &font_tex_);
+    if (hd_font_tex_) glDeleteTextures(1, &hd_font_tex_);
+    hd_font_tex_ = 0;
+    hd_atlas_px_ = 0.0f;
+    hd_glyphs_.clear();
     glDeleteBuffers(1, &vbo_);
     glDeleteVertexArrays(1, &vao_);
     glDeleteProgram(program_);
@@ -260,6 +267,144 @@ void GlPresenter::screen(const ntr::Frame& frame, int layer, const Rect& where, 
     quad(where, u0, 0, u1, 1);
     glEnable(GL_BLEND);
     glUniform1i(u_swap_, 0);
+}
+
+void GlPresenter::reset_hd_atlas(float px_height) {
+    if (!hd_font_tex_) glGenTextures(1, &hd_font_tex_);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, hd_font_tex_);
+    std::vector<uint8_t> zeros(size_t(kHdAtlasSize) * size_t(kHdAtlasSize), 0);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, kHdAtlasSize, kHdAtlasSize, 0, GL_RED, GL_UNSIGNED_BYTE, zeros.data());
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glActiveTexture(GL_TEXTURE0);
+    hd_atlas_px_ = px_height;
+    hd_pen_x_ = 1;
+    hd_pen_y_ = 1;
+    hd_row_h_ = 0;
+    hd_glyphs_.clear();
+}
+
+const GlPresenter::HdAtlasGlyph* GlPresenter::get_hd_glyph(uint16_t codepoint) {
+    if (auto it = hd_glyphs_.find(codepoint); it != hd_glyphs_.end()) return &it->second;
+    const stbtt_fontinfo* font = hd_font_info();
+    if (!font || !hd_font_tex_ || hd_atlas_px_ <= 0.0f) return nullptr;
+
+    // Calibrate scale on capital 'H' height so Inter Bold matches the DS dialogue box proportions cleanly.
+    int hx0 = 0, hy0 = 0, hx1 = 0, hy1 = 0;
+    stbtt_GetCodepointBox(font, 'H', &hx0, &hy0, &hx1, &hy1);
+    const float cap_units = float(hy1 - hy0);
+    const float scale = (cap_units > 10.0f) ? (hd_atlas_px_ / cap_units) : stbtt_ScaleForPixelHeight(font, hd_atlas_px_ * 1.5f);
+    int w = 0, h = 0, xoff = 0, yoff = 0;
+    unsigned char* bmp = stbtt_GetCodepointBitmap(font, scale, scale, int(codepoint), &w, &h, &xoff, &yoff);
+
+    HdAtlasGlyph g;
+    g.w = w;
+    g.h = h;
+    g.xoff = xoff;
+    g.yoff = yoff;
+    if (bmp && w > 0 && h > 0) {
+        if (hd_pen_x_ + w + 1 > kHdAtlasSize) {
+            hd_pen_x_ = 1;
+            hd_pen_y_ += hd_row_h_ + 1;
+            hd_row_h_ = 0;
+        }
+        if (hd_pen_y_ + h + 1 <= kHdAtlasSize) {
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, hd_font_tex_);
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+            glTexSubImage2D(GL_TEXTURE_2D, 0, hd_pen_x_, hd_pen_y_, w, h, GL_RED, GL_UNSIGNED_BYTE, bmp);
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+            glActiveTexture(GL_TEXTURE0);
+            const float inv = 1.0f / float(kHdAtlasSize);
+            g.u0 = float(hd_pen_x_) * inv;
+            g.v0 = float(hd_pen_y_) * inv;
+            g.u1 = float(hd_pen_x_ + w) * inv;
+            g.v1 = float(hd_pen_y_ + h) * inv;
+            g.empty = false;
+            hd_pen_x_ += w + 1;
+            hd_row_h_ = std::max(hd_row_h_, h);
+        }
+    }
+    if (bmp) stbtt_FreeBitmap(bmp, nullptr);
+    auto [it, _] = hd_glyphs_.emplace(codepoint, g);
+    return &it->second;
+}
+
+void GlPresenter::draw_hd_text(int layer, const Rect& where, int wide_extra, const HudMove* hud, int hud_count) {
+    hd_text_draw_list(layer, hd_scratch_);
+    if (hd_scratch_.empty() || where.w <= 0.0f || where.h <= 0.0f) return;
+    if (!hd_font_info()) return;
+
+    const float sx = where.w / (256.0f + 2.0f * float(wide_extra));
+    const float sy = where.h / 192.0f;
+    // Calibrate capital height to 9.2 DS pixels (for a 16-DS-px cell).
+    constexpr float kCapDsPx = 9.2f;
+    const float target_cap_px = std::clamp(std::round(kCapDsPx * sy), 16.0f, 96.0f);
+    if (!hd_font_tex_ || std::fabs(target_cap_px - hd_atlas_px_) > std::max(3.0f, hd_atlas_px_ * 0.15f)) {
+        reset_hd_atlas(target_cap_px);
+    }
+
+    // Clip HD text strictly to the DS screen rectangle (OpenGL scissor Y originates at window bottom).
+    const int sc_x = std::clamp(int(std::floor(where.x)), 0, width_);
+    const int sc_y = std::clamp(int(std::floor(float(height_) - (where.y + where.h))), 0, height_);
+    const int sc_w = std::clamp(int(std::ceil(where.w)), 0, width_ - sc_x);
+    const int sc_h = std::clamp(int(std::ceil(where.h)), 0, height_ - sc_y);
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(sc_x, sc_y, sc_w, sc_h);
+
+    glUniform1i(u_mode_, 2);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, hd_font_tex_);
+    glActiveTexture(GL_TEXTURE0);
+
+    for (const HdGlyph& g : hd_scratch_) {
+        const HdAtlasGlyph* ag = get_hd_glyph(g.codepoint);
+        if (!ag || ag->empty) continue;
+
+        float ds_x = g.ds_x;
+        const float ds_y = g.ds_y;
+        for (int i = 0; i < hud_count; ++i) {
+            const HudMove& m = hud[i];
+            if (ds_y >= float(m.y0) && ds_y < float(m.y1) && ds_x >= float(m.x0) && ds_x < float(m.x1)) {
+                ds_x += float(m.dx);
+                break;
+            }
+        }
+
+        const float cell_ratio = g.cell_h / 16.0f;
+        const float scale_y = (kCapDsPx * cell_ratio * sy) / hd_atlas_px_;
+        const float scale_x = (kCapDsPx * cell_ratio * sx) / hd_atlas_px_;
+        const float slot_left = where.x + (ds_x + float(wide_extra)) * sx;
+        const float slot_w = std::max(1.0f, g.slot_w) * sx;
+        const float max_w = std::max(slot_w, std::max(1.0f, g.char_w) * sx) * 1.08f;
+
+        float draw_w = float(ag->w) * scale_x;
+        if (draw_w > max_w) draw_w = max_w;
+        const float draw_h = float(ag->h) * scale_y;
+        const float draw_x = slot_left + (slot_w - draw_w) * 0.5f;
+        const float base_y = where.y + (ds_y + g.baseline - 1.5f) * sy;
+        const float draw_y = base_y + float(ag->yoff) * scale_y;
+
+        // Add a subtle dark shadow behind light text (white/colored on dark boxes); keep dark ink crisp on parchment.
+        const float r = float((g.argb >> 16) & 0xFFu) / 255.0f;
+        const float gr = float((g.argb >> 8) & 0xFFu) / 255.0f;
+        const float b = float(g.argb & 0xFFu) / 255.0f;
+        const float luma = 0.299f * r + 0.587f * gr + 0.114f * b;
+        if (luma > 0.45f) {
+            set_color(u_color_, 0x80000000u);
+            quad({draw_x + 0.45f * sx, draw_y + 0.65f * sy, draw_w, draw_h}, ag->u0, ag->v0, ag->u1, ag->v1);
+        }
+
+        set_color(u_color_, g.argb);
+        quad({draw_x, draw_y, draw_w, draw_h}, ag->u0, ag->v0, ag->u1, ag->v1);
+    }
+
+    glDisable(GL_SCISSOR_TEST);
 }
 
 void GlPresenter::fill(const Rect& where, uint32_t argb) {
@@ -377,7 +522,9 @@ bool GlPresenter::recover(std::string& error) {
     // deleting them in the replacement context, then create a fresh presenter context.
     SDL_GL_MakeCurrent(window_, nullptr);
     context_ = nullptr;
-    program_ = vao_ = vbo_ = soft_tex_ = font_tex_ = read_fbo_ = thumb_tex_ = 0;
+    program_ = vao_ = vbo_ = soft_tex_ = font_tex_ = hd_font_tex_ = read_fbo_ = thumb_tex_ = 0;
+    hd_atlas_px_ = 0.0f;
+    hd_glyphs_.clear();
     checked_frame_texture_ = 0;
     checked_frame_texture_valid_ = true;
     u_view_ = u_mode_ = u_layer_ = u_color_ = u_tex_ = u_font_ = u_swap_ = -1;

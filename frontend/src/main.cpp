@@ -18,7 +18,7 @@
 //   PhantomHourglass.exe <rom.nds> [--save-file F] [--data-dir D] [--input-script S] [--exit-after-frames N]
 //                        [--fullscreen] [--unpaced] [--module M] [--read-only-save] [--renderer software|gpu|compute]
 //                        [--scale 2|4|6|8] [--continue] [--wide] [--wide21] [--textures pixels|smooth|sharp]
-//                        [--fixes 0-3]
+//                        [--fixes 0-3] [--hd-text]
 #include <SDL3/SDL.h>
 #ifdef __ANDROID__
 #include <SDL3/SDL_main.h>  // (SDL's Android activity calls SDL_main in libmain.so)
@@ -51,6 +51,7 @@
 #include "pad_input.hpp"
 #include "ph_stick.hpp"
 #include "ph_hooks.hpp"
+#include "ph_text.hpp"
 #include "png.hpp"
 #include "gl_present.hpp"
 #ifndef __ANDROID__
@@ -84,6 +85,7 @@ std::atomic<int> compute{-1};
 std::atomic<bool> compute_failed{false};
 std::atomic<bool> resume_done{false};
 std::atomic<int> wide_mode{-1};
+std::atomic<int> hd_text{-1};
 }  // namespace ph::pad
 
 namespace {
@@ -166,6 +168,7 @@ struct Settings {
     int wide_mode = 1;    // 1: 16:9, 2: 21:9
     int textures = 0;     // the 3D's textures with the GPU renderer: 0 the DS's pixels, 1 smooth, 2 sharp
     int fixes = 0;        // 3D fixes, bits: 1 fewer seams (GPU renderer's better polygons), 2 stable textures (no warp)
+    bool hd_text = false; // render OBJ dialogue text with an embedded vector TrueType font
 };
 
 Settings load_settings(const fs::path& p) {
@@ -190,6 +193,7 @@ Settings load_settings(const fs::path& p) {
         else if (k == "wide_mode") s.wide_mode = std::clamp(std::atoi(v.c_str()), 1, 2);
         else if (k == "textures") s.textures = std::clamp(std::atoi(v.c_str()), 0, 2);
         else if (k == "fixes") s.fixes = std::clamp(std::atoi(v.c_str()), 0, 3);
+        else if (k == "hd_text") s.hd_text = v == "1";
     }
     if (std::find(std::begin(kScales), std::end(kScales), s.scale) == std::end(kScales)) s.scale = 4;
     return s;
@@ -214,6 +218,7 @@ void save_settings(const fs::path& p, const Settings& s) {
     f << "wide_mode=" << s.wide_mode << "\n";
     f << "textures=" << s.textures << "\n";
     f << "fixes=" << s.fixes << "\n";
+    f << "hd_text=" << (s.hd_text ? 1 : 0) << "\n";
 }
 
 ntr::VideoSettings video_for(const Settings& s) {
@@ -550,6 +555,7 @@ public:
     void on_state_loaded(bool ok, const std::string& error) override {
         const int slot = load_slot_;
         load_slot_ = 0;
+        if (ok) ph::hd_text_reset();
         if (slot == kResumeSlot) return s_.say(ok ? "Continued from where you left off" : "Could not continue: " + error);
         s_.say(ok ? "Loaded slot " + std::to_string(slot) : "Slot " + std::to_string(slot) + " not loaded: " + error);
     }
@@ -642,17 +648,31 @@ private:
         const int extra = view.wide ? frame.wide_extra : 0;  // (0 until the renderer has made the change)
         s_.wide_extra = extra;
         s_.wide_layer = frame.wide_layer;
+        std::array<ph::HudMove, 32> frame_hud{};
+        int frame_hud_count = 0;
         {
             std::lock_guard<std::mutex> lock(s_.hud_mutex);
             s_.hud_count = extra ? frame.hud_moves : 0;
+            frame_hud_count = s_.hud_count;
             for (int i = 0; i < s_.hud_count; i++) {
                 const auto& m = frame.hud_move[i];
                 s_.hud[size_t(i)] = {m.x0, m.y0, m.x1, m.y1, m.dx};
+                frame_hud[size_t(i)] = s_.hud[size_t(i)];
             }
         }
         const ph::Views v = ph::compute_views(float(w), float(h), view.layout, view.stretch, extra, frame.wide_layer);
-        if (v.top_shown) gl_->screen(frame, 0, v.top, view.smooth, extra > 0);
-        if (v.bottom_shown) gl_->screen(frame, 1, v.bottom, view.smooth, extra > 0);
+        if (v.top_shown) {
+            gl_->screen(frame, 0, v.top, view.smooth, extra > 0);
+            const bool wide_top = extra > 0 && frame.wide_layer == 0;
+            gl_->draw_hd_text(0, v.top, wide_top ? extra : 0, wide_top ? frame_hud.data() : nullptr,
+                              wide_top ? frame_hud_count : 0);
+        }
+        if (v.bottom_shown) {
+            gl_->screen(frame, 1, v.bottom, view.smooth, extra > 0);
+            const bool wide_bot = extra > 0 && frame.wide_layer == 1;
+            gl_->draw_hd_text(1, v.bottom, wide_bot ? extra : 0, wide_bot ? frame_hud.data() : nullptr,
+                              wide_bot ? frame_hud_count : 0);
+        }
         // Frames per second: the game's frames shown, counted over a second.
         if (count_game_frame) fps_frames_++;
         if (count_game_frame) if (const uint64_t now = SDL_GetTicks(); now - fps_since_ >= 1000) {
@@ -714,6 +734,7 @@ private:
             ms.textures = view.textures;
             ms.fixes = view.fixes;
             ms.compute = view.compute;
+            ms.hd_text = view.hd_text;
             const int layer = view.layout == Layout::Top ? 0 : 1;  // the screen the player looks at
             menu.draw(*gl_, ms, float(w), float(h), ui, float(ph::pad::game_fps10.load()) / 10.0f,
                       [&](int slot, const ph::Rect& r) { gl_->thumbnail(slot, layer, r); });
@@ -900,7 +921,7 @@ int main(int argc, char** argv) {
     fs::path rom_path, save_path, data_dir, script_path, module_path = ph::default_module_path();
     uint64_t exit_after = 0;
     bool fullscreen_arg = false, unpaced = false, read_only_save = false, continue_arg = false, wide_arg = false, wide21_arg = false;
-    bool fps_probe_arg = false;
+    bool fps_probe_arg = false, hd_text_arg = false;
     std::string renderer_arg, textures_arg;
     int scale_arg = 0, fixes_arg = -1;
     for (int i = 1; i < argc; i++) {
@@ -922,6 +943,7 @@ int main(int argc, char** argv) {
         else if (a == "--fps-probe") fps_probe_arg = true;
         else if (a == "--textures" && has) textures_arg = argv[++i];
         else if (a == "--fixes" && has) fixes_arg = std::atoi(argv[++i]);
+        else if (a == "--hd-text") hd_text_arg = true;
         else if (a == "--no-settings") {}  // (accepted: tests never write settings anyway, see below)
         else if (!a.empty() && a[0] != '-' && rom_path.empty()) rom_path = a;
         else {
@@ -973,6 +995,7 @@ int main(int argc, char** argv) {
     else if (textures_arg == "smooth") settings.textures = 1;
     else if (textures_arg == "sharp") settings.textures = 2;
     if (fixes_arg >= 0 && fixes_arg <= 3) settings.fixes = fixes_arg;
+    if (hd_text_arg) settings.hd_text = true;
     // "opengl" = "gpu" (melonDS's OpenGL renderer), the name ST and phoneperf use.
     if (renderer_arg == "gpu" || renderer_arg == "opengl") settings.gpu = true, settings.compute = false;
     else if (renderer_arg == "compute") settings.gpu = settings.compute = true;
@@ -983,6 +1006,7 @@ int main(int argc, char** argv) {
 #endif
     ph::pad::fps = settings.fps;
     ph::pad::fps_corner = settings.fps_corner;
+    ph::set_hd_text_enabled(settings.hd_text);
 
     // ---- window: the largest whole multiple of the DS screen that fits the desktop with room to spare ----
     SDL_Rect usable{0, 0, 1280, 720};
@@ -1109,6 +1133,7 @@ int main(int argc, char** argv) {
         ms.textures = settings.textures;
         ms.fixes = settings.fixes;
         ms.compute = settings.compute;
+        ms.hd_text = settings.hd_text;
         return ms;
     };
     auto menu_done = [&](const ph::MenuState& ms, ph::MenuResult r) {
@@ -1124,6 +1149,10 @@ int main(int argc, char** argv) {
         settings.textures = ms.textures;
         settings.fixes = ms.fixes;
         settings.compute = ms.compute;
+        if (ms.hd_text != settings.hd_text) {
+            settings.hd_text = ms.hd_text;
+            ph::set_hd_text_enabled(settings.hd_text);
+        }
         if (ms.fullscreen != settings.fullscreen) set_fullscreen(ms.fullscreen);
         ph::pad::fps = settings.fps;
         ph::pad::fps_corner = settings.fps_corner;
@@ -1265,6 +1294,11 @@ int main(int argc, char** argv) {
         bool changed = false;
         if (const int want = ph::pad::show.exchange(-1); want >= 0 && want <= 2) settings.layout = Layout(want), changed = true;
         if (const int want = ph::pad::smooth.exchange(-1); want >= 0) settings.smooth = want != 0, changed = true;
+        if (const int want = ph::pad::hd_text.exchange(-1); want >= 0) {
+            settings.hd_text = want != 0;
+            ph::set_hd_text_enabled(settings.hd_text);
+            changed = true;
+        }
         if (const int want = ph::pad::stretch.exchange(-1); want >= 0) settings.stretch = want != 0, changed = true;
         bool video = false;
         if (const int want = ph::pad::wide_mode.exchange(-1); want >= 0 && want <= 2) {

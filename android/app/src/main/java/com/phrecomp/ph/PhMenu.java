@@ -125,6 +125,11 @@ final class PhMenu {
             PhInput.nativeSetSmooth(i == 1);
             refresh();
         }, null);
+        toggle(list, "HD text", "Renders dialogue text with a smooth vector font at screen resolution.",
+                prefs.getBoolean("hd_text", false), on -> {
+                    prefs.edit().putBoolean("hd_text", on).apply();
+                    PhInput.nativeSetHdText(on);
+                });
         list.addView(label("Picture size", "Fit keeps the DS's shape; Stretch fills the whole screen (the controls sit "
                 + "over the picture)."));
         chips(list, new String[] {"Fit", "Stretch"}, prefs.getBoolean("stretch", false) ? 1 : 0, i -> {
