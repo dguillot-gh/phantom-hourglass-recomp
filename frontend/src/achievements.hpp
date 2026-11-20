@@ -123,7 +123,8 @@ private:
 
         // Story helpers
         bool visited_astrid_basement = false;
-        bool visited_sword_cave = false;
+        bool sword_tuto_armed = false;
+        uint8_t sword_tuto_base_adv0 = 0;
 
         // Blaaz (0x2B00): defeat without healing
         bool blaaz_active = false;

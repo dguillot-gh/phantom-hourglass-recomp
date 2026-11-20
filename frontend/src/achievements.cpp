@@ -18,25 +18,21 @@ namespace {
 // ---- Phantom Hourglass (USA / AZEE) verified RAM & DTCM layout ----
 // DTCM singleton pointers (zeldaret/ph config/usa/arm9/dtcm/symbols.txt):
 constexpr uint32_t kGameModeId       = 0x027E0618u;  // Game::mModeId (2 = Adventure)
+constexpr uint32_t kPtrMapManager    = 0x027E0E60u;  // MapManager*
 constexpr uint32_t kPtrAdvFlags      = 0x027E0F74u;  // AdventureFlags*
 constexpr uint32_t kPtrPlayer        = 0x027E0F90u;  // PlayerBase*
 constexpr uint32_t kPtrItemManager   = 0x027E0FB4u;  // ItemManager*
 constexpr uint32_t kPtrPlayerManager = 0x027E0FBCu;  // PlayerManager*
 
-// Verified static AZEE addresses (MultiworldGG tloz_ph Addresses.py):
-constexpr uint32_t kAddrStage             = 0x021B2E94u;  // u32 current stage ID
-constexpr uint32_t kAddrRoom              = 0x021B2EA6u;  // u8 current room ID
-constexpr uint32_t kAddrIslandUncharted   = 0x021B4CCCu;  // u8 != 0 when discovered
-constexpr uint32_t kAddrIslandHarrow      = 0x021B4D44u;  // u8 != 0 when discovered
-constexpr uint32_t kAddrIslandDeeEss      = 0x021B4D6Cu;  // u8 != 0 when discovered
-constexpr uint32_t kAddrIslandMaze        = 0x021B4DE4u;  // u8 != 0 when discovered
-constexpr uint32_t kAddrAdvFlagsFallback  = 0x021B557Cu;  // 52 bytes
-constexpr uint32_t kAddrDefeatedBellum    = 0x021B5774u;  // u8: 1 or 0xBB when Bellumbeck beaten
-constexpr uint32_t kAddrInCutscene        = 0x021BBCF4u;  // u8
-constexpr uint32_t kAddrHourglassCurrent  = 0x021E2A48u;  // u32 current remaining sand frames in TotOK
-constexpr uint32_t kAddrSalvageHealthLive = 0x021F5720u;  // u8 live salvage arm health during dive
-constexpr uint32_t kAddrBoatHealthLive    = 0x021FA036u;  // u8 live ship health at sea / Bellum 2
-constexpr uint32_t kAddrInMinigame        = 0x02307D77u;  // u8
+// Offsets within the contiguous Adventure heap block relative to `gAdventureFlags` (0x021B557C in BizHawk,
+// 0x021B553C in PH-Recomp — verified across live savestates to match byte-for-byte with relative offsets!):
+constexpr int32_t kRelStage            = -0x26E8;  // u32 current stage ID (fallback to MapManager::mCourse::mIndex)
+constexpr int32_t kRelRoom             = -0x26D6;  // u8 current room ID
+constexpr int32_t kRelIslandUncharted  = -0x08B0;  // u8 != 0 when Uncharted Island discovered
+constexpr int32_t kRelIslandHarrow     = -0x0838;  // u8 != 0 when Harrow Island discovered
+constexpr int32_t kRelIslandDeeEss     = -0x0810;  // u8 != 0 when Dee Ess Island discovered
+constexpr int32_t kRelIslandMaze       = -0x0798;  // u8 != 0 when Maze Island discovered
+constexpr int32_t kRelHourglassCurrent = +0x2D4CC; // u32 current remaining sand frames in TotOK (when valid)
 
 // ItemManager field offsets (zeldaret/ph include/Item/ItemManager.hpp):
 constexpr uint32_t kImHourglassFrames  = 0x00Cu;  // u32 (max 90000 = 25:00)
@@ -62,7 +58,6 @@ constexpr uint32_t kPmSalvageArmHealth = 0x08u;   // u16 (max 5)
 constexpr uint32_t kStageCannonGame    = 1u;
 constexpr uint32_t kStageSalvage       = 3u;
 constexpr uint32_t kStagePrinceRedLion = 7u;
-constexpr uint32_t kStageMercay        = 11u;
 constexpr uint32_t kStageGust          = 14u;
 constexpr uint32_t kStageDeeEss        = 27u;
 constexpr uint32_t kStageTotOK         = 37u;
@@ -433,17 +428,22 @@ void Achievements::tick(const ntr::Runtime& rt, uint64_t now_ms) {
             return n;
         }();
 
-        // Only evaluate during active Adventure gameplay (GameModeId_Adventure == 2).
+        // Only evaluate during active Adventure gameplay (GameModeId_Adventure == 2) with valid DTCM singletons.
         const uint32_t game_mode = rt.peek32(kGameModeId);
         const uint32_t im_ptr = rt.peek32(kPtrItemManager);
         const uint32_t pm_ptr = rt.peek32(kPtrPlayerManager);
         const uint32_t af_ptr = rt.peek32(kPtrAdvFlags);
-        const bool valid_ptrs = (game_mode == 2u) && in_main_ram(im_ptr) && in_main_ram(pm_ptr);
+        const uint32_t mm_ptr = rt.peek32(kPtrMapManager);
+        const bool valid_ptrs = (game_mode == 2u) && in_main_ram(im_ptr) && in_main_ram(pm_ptr) && in_main_ram(af_ptr);
         if (!valid_ptrs) {
             if (tr_.in_adventure) reset_trackers_locked();
             return;
         }
         tr_.in_adventure = true;
+
+        auto rel_addr = [af_ptr](int32_t delta) -> uint32_t {
+            return uint32_t(int32_t(af_ptr) + delta);
+        };
 
         // Read ItemManager fields
         uint32_t item_flags[4]{};
@@ -480,11 +480,10 @@ void Achievements::tick(const ntr::Runtime& rt, uint64_t now_ms) {
             if (in_main_ram(sword_ptr)) sword_in_use = peek8(rt, sword_ptr + 8u) != 0;
         }
 
-        // Read AdventureFlags (52 bytes)
-        const uint32_t adv_base = in_main_ram(af_ptr) ? af_ptr : kAddrAdvFlagsFallback;
+        // Read AdventureFlags (52 bytes) directly from DTCM gAdventureFlags pointer
         uint8_t adv[52]{};
         for (uint32_t i = 0; i < 52u; i += 4u) {
-            const uint32_t w = rt.peek32(adv_base + i);
+            const uint32_t w = rt.peek32(af_ptr + i);
             adv[i + 0] = uint8_t(w & 0xFFu);
             adv[i + 1] = uint8_t((w >> 8) & 0xFFu);
             adv[i + 2] = uint8_t((w >> 16) & 0xFFu);
@@ -494,30 +493,36 @@ void Achievements::tick(const ntr::Runtime& rt, uint64_t now_ms) {
         // Read PlayerManager health / ship / salvage
         const uint16_t max_health = peek16(rt, pm_ptr + kPmMaxHealth);
         const uint16_t health = peek16(rt, pm_ptr + kPmHealth);
-        const int16_t ship_health_pm = int16_t(peek16(rt, pm_ptr + kPmShipHealth));
-        const uint16_t salvage_arm_pm = peek16(rt, pm_ptr + kPmSalvageArmHealth);
+        const int16_t ship_health = int16_t(peek16(rt, pm_ptr + kPmShipHealth));
+        const uint16_t salvage_arm_hp = peek16(rt, pm_ptr + kPmSalvageArmHealth);
 
         // Sanity filter: ignore uninitialized frames right after boot/file load (Link always has >= 12 max health)
         if (max_health < 12u || max_health > 64u) {
             return;
         }
 
-        // Current stage / room / scene
-        const uint32_t stage = rt.peek32(kAddrStage);
-        const uint8_t room = peek8(rt, kAddrRoom);
+        // Current stage / room / scene: prefer MapManager::mCourse->mIndex when loaded, else relative stage
+        uint32_t stage = rt.peek32(rel_addr(kRelStage));
+        if (in_main_ram(mm_ptr)) {
+            const uint32_t course_ptr = rt.peek32(mm_ptr);
+            if (in_main_ram(course_ptr)) {
+                const uint32_t cidx = rt.peek32(course_ptr);
+                if (cidx <= 64u) stage = cidx;
+            }
+        }
+        // Ignore title/file-select transition stage (0x6E = 110)
+        if (stage > 64u) {
+            if (tr_.have_prev) reset_trackers_locked();
+            return;
+        }
+        const uint8_t room = peek8(rt, rel_addr(kRelRoom));
         const uint32_t scene = (stage << 8) | uint32_t(room);
-        const uint8_t defeated_bellum = peek8(rt, kAddrDefeatedBellum);
-        const uint32_t hourglass_cur = rt.peek32(kAddrHourglassCurrent);
-        const uint8_t salvage_live = peek8(rt, kAddrSalvageHealthLive);
-        const uint8_t boat_live = peek8(rt, kAddrBoatHealthLive);
-        const int16_t ship_health = (stage == kStageBellum2 && boat_live > 0 && boat_live <= 20)
-                                        ? int16_t(boat_live)
-                                        : ship_health_pm;
-        const bool in_cutscene = peek8(rt, kAddrInCutscene) != 0;
+        const uint32_t raw_hg = rt.peek32(rel_addr(kRelHourglassCurrent));
+        const uint32_t hourglass_cur = (raw_hg > 0u && raw_hg <= kMaxHourglassFrames) ? raw_hg : hourglass_max_frames;
 
-        // Read active player pointer / Gongoron indicator for Dongorongo
+        // Read active player pointer for Dongorongo Link <-> Gongoron switch tracking
         const uint32_t player_ptr = rt.peek32(kPtrPlayer);
-        const int32_t char_id = int32_t(player_ptr);  // changes when switching Link <-> Gongoron
+        const int32_t char_id = int32_t(player_ptr);
 
         // -----------------------------------------------------------------------------------------
         // 1. Direct Item, Story Flag, and Collectible Achievements (always evaluated cleanly)
@@ -596,10 +601,10 @@ void Achievements::tick(const ntr::Runtime& rt, uint64_t now_ms) {
         if (map_count >= 31) unlock_locked(kLegendaryCartographer, now_ms);
 
         // #48 World Explorer: Discover all 4 uncharted islands (Uncharted, Harrow, Dee Ess, Maze)
-        const int uncharted_found = (peek8(rt, kAddrIslandUncharted) != 0 ? 1 : 0) +
-                                    (peek8(rt, kAddrIslandHarrow) != 0 ? 1 : 0) +
-                                    (peek8(rt, kAddrIslandDeeEss) != 0 ? 1 : 0) +
-                                    (peek8(rt, kAddrIslandMaze) != 0 ? 1 : 0);
+        const int uncharted_found = (peek8(rt, rel_addr(kRelIslandUncharted)) == 1u ? 1 : 0) +
+                                    (peek8(rt, rel_addr(kRelIslandHarrow)) == 1u ? 1 : 0) +
+                                    (peek8(rt, rel_addr(kRelIslandDeeEss)) == 1u ? 1 : 0) +
+                                    (peek8(rt, rel_addr(kRelIslandMaze)) == 1u ? 1 : 0);
         set_progress_locked(kWorldExplorer, uncharted_found);
         if (uncharted_found >= 4) unlock_locked(kWorldExplorer, now_ms);
 
@@ -635,8 +640,8 @@ void Achievements::tick(const ntr::Runtime& rt, uint64_t now_ms) {
         // #20 Where the Wind Blows: reach Isle of Gust (stage 14)
         if (stage == kStageGust) unlock_locked(kWhereTheWindBlows, now_ms);
 
-        // #67 A Wish for Freedom: defeat Bellumbeck / reach credits
-        if (stage == kStageCredits || defeated_bellum == 1u || defeated_bellum == 0xBBu) {
+        // #67 A Wish for Freedom: reach Credits (stage 54) after defeating Bellumbeck
+        if (stage == kStageCredits) {
             unlock_locked(kAWishForFreedom, now_ms);
         }
 
@@ -644,16 +649,24 @@ void Achievements::tick(const ntr::Runtime& rt, uint64_t now_ms) {
         // 2. Edge-Triggered, Story, Boss Challenge, TotOK, and Minigame State Machines
         // -----------------------------------------------------------------------------------------
         const bool scene_changed = tr_.have_prev && (scene != tr_.prev_scene);
-        const bool stage_changed = tr_.have_prev && (stage != tr_.prev_stage);
 
         if (tr_.have_prev) {
-            // #1 Permission Shmermission: raid Oshus's sword cave (0x0B13), get Oshus's Sword, learn swordplay
-            if (scene == 0x0B13u) tr_.visited_sword_cave = true;
-            if (has_item_flag(item_flags, 0, 0) &&
-                (item_rose(tr_.prev_item_flags, item_flags, 0, 0) ||
-                 (tr_.visited_sword_cave && stage == kStageMercay && room != 0x13u && room != 0x0Au) ||
-                 has_item_flag(item_flags, 1, 0))) {
-                unlock_locked(kPermissionShmermission, now_ms);
+            // #1 Permission Shmermission: learn swordplay from Oshus AFTER raiding his sword cave (0x0B13).
+            // Never unlocks inside the cave itself (0x0B13) — only once Oshus's swordplay tutorial completes
+            // outside (0x0B00, setting a new tutorial bit in adv[0]) or once the player advances past the tutorial.
+            if (scene == 0x0B13u && has_item_flag(item_flags, 0, 0) && !tr_.sword_tuto_armed) {
+                tr_.sword_tuto_armed = true;
+                tr_.sword_tuto_base_adv0 = adv[0];
+            }
+            if (has_item_flag(item_flags, 0, 0) && scene != 0x0B13u) {
+                const bool tuto_bit_set = tr_.sword_tuto_armed && (scene == 0x0B00u) &&
+                                          ((adv[0] & ~tr_.sword_tuto_base_adv0) != 0);
+                const bool past_tuto = (stage == 39u /* Mountain Passage */) ||
+                                       has_item_flag(item_flags, 1, 0) /* Phantom Hourglass */;
+                if (tuto_bit_set || past_tuto) {
+                    unlock_locked(kPermissionShmermission, now_ms);
+                    tr_.sword_tuto_armed = false;
+                }
             }
 
             // #15 A Vision of Darkness: rescue Astrid on Isle of Ember (0x0D14 basement -> 0x0D0A house, or Blaaz beaten)
@@ -692,7 +705,7 @@ void Achievements::tick(const ntr::Runtime& rt, uint64_t now_ms) {
                     tr_.cyclok_frames = 0;
                 }
                 if (tr_.cyclok_active) {
-                    if (!in_cutscene) tr_.cyclok_frames++;
+                    tr_.cyclok_frames++;
                     if (adv_rose(tr_.prev_adv_flags, adv, 3, 0x40u)) {
                         if (tr_.cyclok_frames <= 45u * 60u) unlock_locked(kAShortFuse, now_ms);
                         tr_.cyclok_active = false;
@@ -794,7 +807,7 @@ void Achievements::tick(const ntr::Runtime& rt, uint64_t now_ms) {
                     tr_.eox_frames = 0;
                 }
                 if (tr_.eox_active) {
-                    if (!in_cutscene) tr_.eox_frames++;
+                    tr_.eox_frames++;
                     if (adv_rose(tr_.prev_adv_flags, adv, 31, 0x10u)) {
                         if (tr_.eox_frames <= 150u * 60u) unlock_locked(kHammerTime, now_ms);
                         tr_.eox_active = false;
@@ -810,8 +823,7 @@ void Achievements::tick(const ntr::Runtime& rt, uint64_t now_ms) {
                     tr_.salvage_active = true;
                     tr_.salvage_damaged = false;
                 }
-                const int live_hp = (salvage_live > 0 && salvage_live <= 5) ? int(salvage_live) : int(salvage_arm_pm);
-                if (live_hp < 5) tr_.salvage_damaged = true;
+                if (salvage_arm_hp < 5u) tr_.salvage_damaged = true;
             } else {
                 if (tr_.salvage_active && !tr_.salvage_damaged && (salvage_flags & ~tr_.prev_salvage_flags) != 0) {
                     unlock_locked(kBeTheCrane, now_ms);
@@ -833,7 +845,7 @@ void Achievements::tick(const ntr::Runtime& rt, uint64_t now_ms) {
                     tr_.totok_frames = 0;
                 }
                 if (tr_.totok_run_active) {
-                    if (!in_cutscene) tr_.totok_frames++;
+                    tr_.totok_frames++;
                     // Sand replenished if current sand increases (by > 30 frames to ignore pause jitter)
                     if (hourglass_cur > tr_.prev_hourglass_cur + 30u && tr_.prev_hourglass_cur > 0u) {
                         tr_.totok_sand_replenished = true;
@@ -895,34 +907,26 @@ void Achievements::tick(const ntr::Runtime& rt, uint64_t now_ms) {
                 }
                 if (health < tr_.prev_health) tr_.bellum3_damage_taken += int(tr_.prev_health - health);
                 if (equipped_fairy != -1) tr_.bellum3_spirit_used = true;
-                if (defeated_bellum == 1u || defeated_bellum == 0xBBu) {
+            } else if (tr_.bellum3_active) {
+                if (stage == kStageCredits) {
+                    unlock_locked(kAWishForFreedom, now_ms);
                     if (tr_.bellum3_damage_taken < 12 && !tr_.bellum3_spirit_used) {
                         unlock_locked(kDefenderOfTheSeas, now_ms);
                     }
-                    tr_.bellum3_active = false;
-                }
-            } else if (tr_.bellum3_active) {
-                if (stage == kStageCredits && tr_.bellum3_damage_taken < 12 && !tr_.bellum3_spirit_used) {
-                    unlock_locked(kDefenderOfTheSeas, now_ms);
                 }
                 tr_.bellum3_active = false;
             }
 
             // ---- Minigame #49: Rollin', Rollin', Rollin' (Goron Game on Dee Ess 0x1B00, <= 30s) ----
             if (stage == kStageDeeEss) {
-                const bool mini_on = peek8(rt, kAddrInMinigame) != 0;
-                if (mini_on && !tr_.goron_active) {
+                if (!tr_.goron_active) {
                     tr_.goron_active = true;
                     tr_.goron_frames = 0;
                 }
-                if (tr_.goron_active) {
-                    if (!in_cutscene) tr_.goron_frames++;
-                    if (adv_rose(tr_.prev_adv_flags, adv, 35, 0x20u)) {
-                        if (tr_.goron_frames <= 30u * 60u) unlock_locked(kRollinRollinRollin, now_ms);
-                        tr_.goron_active = false;
-                    } else if (!mini_on) {
-                        tr_.goron_active = false;
-                    }
+                tr_.goron_frames++;
+                if (adv_rose(tr_.prev_adv_flags, adv, 35, 0x20u)) {
+                    if (tr_.goron_frames <= 30u * 60u) unlock_locked(kRollinRollinRollin, now_ms);
+                    tr_.goron_active = false;
                 }
             } else {
                 tr_.goron_active = false;
@@ -930,27 +934,23 @@ void Achievements::tick(const ntr::Runtime& rt, uint64_t now_ms) {
 
             // ---- Minigame #52 & #56: Prince of Red Lions Sword Training (stage 7, 0x0700) ----
             if (stage == kStagePrinceRedLion) {
-                const bool mini_on = peek8(rt, kAddrInMinigame) != 0;
-                if (mini_on && !tr_.train_active) {
+                if (!tr_.train_active) {
                     tr_.train_active = true;
                     tr_.train_streak = 0;
                     tr_.train_max_streak = 0;
                     tr_.train_total_hits = 0;
                 }
-                if (tr_.train_active) {
-                    if (health < tr_.prev_health) tr_.train_streak = 0;
-                    if (sword_in_use && !tr_.prev_sword_in_use) {
-                        tr_.train_streak++;
-                        tr_.train_total_hits++;
-                        tr_.train_max_streak = std::max(tr_.train_max_streak, tr_.train_streak);
-                    }
-                    if (tr_.train_max_streak >= 90 && has_adv_bit(adv, 40, 0x40u)) {
-                        unlock_locked(kSecondIntention, now_ms);
-                    }
-                    if (tr_.train_total_hits > 200 && has_adv_bit(adv, 40, 0x40u)) {
-                        unlock_locked(kDoubleHero, now_ms);
-                    }
-                    if (!mini_on) tr_.train_active = false;
+                if (health < tr_.prev_health) tr_.train_streak = 0;
+                if (sword_in_use && !tr_.prev_sword_in_use) {
+                    tr_.train_streak++;
+                    tr_.train_total_hits++;
+                    tr_.train_max_streak = std::max(tr_.train_max_streak, tr_.train_streak);
+                }
+                if (tr_.train_max_streak >= 90 && has_adv_bit(adv, 40, 0x40u)) {
+                    unlock_locked(kSecondIntention, now_ms);
+                }
+                if (tr_.train_total_hits > 200 && has_adv_bit(adv, 40, 0x40u)) {
+                    unlock_locked(kDoubleHero, now_ms);
                 }
             } else {
                 tr_.train_active = false;
@@ -970,23 +970,17 @@ void Achievements::tick(const ntr::Runtime& rt, uint64_t now_ms) {
 
             // ---- Minigame #57: Sharpshooter (Shooting Range, Molida 0x0C0B, combo >= 25) ----
             if (scene == 0x0C0Bu) {
-                const bool mini_on = peek8(rt, kAddrInMinigame) != 0;
-                if (mini_on && !tr_.shoot_active) {
+                if (!tr_.shoot_active) {
                     tr_.shoot_active = true;
                     tr_.shoot_combo = 0;
                 }
-                if (tr_.shoot_active) {
-                    if (arrows < tr_.prev_arrows) tr_.shoot_combo++;
-                    if (tr_.shoot_combo >= 25 && has_adv_bit(adv, 42, 0x10u)) {
-                        unlock_locked(kSharpshooter, now_ms);
-                    }
-                    if (!mini_on) tr_.shoot_active = false;
+                if (arrows < tr_.prev_arrows) tr_.shoot_combo++;
+                if (tr_.shoot_combo >= 25 && has_adv_bit(adv, 42, 0x10u)) {
+                    unlock_locked(kSharpshooter, now_ms);
                 }
             } else {
                 tr_.shoot_active = false;
             }
-
-            (void)stage_changed;
         }
 
         // Store previous frame snapshot

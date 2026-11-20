@@ -71,12 +71,20 @@ public:
     void w32(uint32_t a, uint32_t v) { if (auto* p = ptr(a & ~3u)) std::memcpy(p, &v, 4); }
 };
 
-constexpr uint32_t kImBase    = 0x021BA51Cu;
-constexpr uint32_t kPmBase    = 0x021BA388u;
-constexpr uint32_t kAfBase    = 0x021B557Cu;
-constexpr uint32_t kAmmoBase  = 0x021BA6B8u;
-constexpr uint32_t kEquipArr  = 0x021BA700u;
-constexpr uint32_t kSwordObj  = 0x021BA740u;
+// Use PH-Recomp's real -0x40 heap layout to verify all relative offsets against gAdventureFlags!
+constexpr uint32_t kImBase    = 0x021BA4DCu;
+constexpr uint32_t kPmBase    = 0x021BA348u;
+constexpr uint32_t kAfBase    = 0x021B553Cu;
+constexpr uint32_t kStageAddr = kAfBase - 0x26E8u;
+constexpr uint32_t kRoomAddr  = kAfBase - 0x26D6u;
+constexpr uint32_t kHgCurAddr = kAfBase + 0x2D4CCu;
+constexpr uint32_t kIslUnch   = kAfBase - 0x08B0u;
+constexpr uint32_t kIslHarrow = kAfBase - 0x0838u;
+constexpr uint32_t kIslDeeEss = kAfBase - 0x0810u;
+constexpr uint32_t kIslMaze   = kAfBase - 0x0798u;
+constexpr uint32_t kAmmoBase  = 0x021BA678u;
+constexpr uint32_t kEquipArr  = 0x021BA6C0u;
+constexpr uint32_t kSwordObj  = 0x021BA700u;
 
 void setup_adventure(MockRuntime& rt) {
     rt.w32(0x027E0618u, 2u);        // GameModeId_Adventure
@@ -133,11 +141,25 @@ int main() {
     ach.tick(rt, 100);
     CHECK(ach.snapshot().unlocked_count == 0);
 
-    // 3. Enter Adventure mode & test collectibles + items + progress bars
+    // 3. Enter Adventure mode & test Permission Shmermission (must NOT unlock inside Sword Cave 0x0B13!)
     setup_adventure(rt);
+    rt.w32(kStageAddr, 11u);       // Mercay Island
+    rt.w8(kRoomAddr, 0x13u);       // Sword Cave (0x0B13)
+    rt.w8(kAfBase + 0u, 0x22u);    // Opened chest in cave, tutorial NOT done yet
+    rt.w32(kImBase + 0x128u, 1u);  // Oshus's Sword acquired in cave
     uint64_t t = 1000;
     ach.tick(rt, t);
-    CHECK(ach.snapshot().unlocked_count == 0);
+    t += 16; ach.tick(rt, t);
+    CHECK(!is_unlocked(ach, "permission_shmermission"));
+    CHECK(!is_unlocked(ach, "world_explorer"));
+
+    // Exit cave to Mercay SW (0x0B00): still locked until Oshus finishes swordplay tutorial (sets adv[0] bit)
+    rt.w8(kRoomAddr, 0x00u);
+    t += 16; ach.tick(rt, t);
+    CHECK(!is_unlocked(ach, "permission_shmermission"));
+    rt.w8(kAfBase + 0u, 0x22u | 0x40u);  // Tutorial bit rises!
+    t += 16; ach.tick(rt, t);
+    CHECK(is_unlocked(ach, "permission_shmermission"));
 
     // Collect 10 Power Gems, 6 Treasures, 3 Treasure Maps, 6 Golden Frogs, 5 Fish, 13 Heart Containers, 4 Uncharted Islands
     rt.w8(kImBase + 0x024u + 1u, 10u);  // Power Gems = 10
@@ -148,10 +170,10 @@ int main() {
     for (int i = 0; i < 5; i++) rt.w8(kImBase + 0x098u + uint32_t(i), 1u);
     rt.w16(kPmBase + 0x00u, 64u);       // 16 hearts (13 Heart Containers)
     rt.w16(kPmBase + 0x02u, 64u);
-    rt.w8(0x021B4CCCu, 1u);             // Uncharted
-    rt.w8(0x021B4D44u, 1u);             // Harrow
-    rt.w8(0x021B4D6Cu, 1u);             // Dee Ess
-    rt.w8(0x021B4DE4u, 1u);             // Maze
+    rt.w8(kIslUnch, 1u);                // Uncharted
+    rt.w8(kIslHarrow, 1u);              // Harrow
+    rt.w8(kIslDeeEss, 1u);              // Dee Ess
+    rt.w8(kIslMaze, 1u);                // Maze
     rt.w16(kImBase + 0x0B4u, 2u);       // Quiver max
     rt.w16(kImBase + 0x0B6u, 2u);       // Bomb bag max
     rt.w16(kImBase + 0x0B8u, 2u);       // Bombchu bag max
@@ -180,7 +202,7 @@ int main() {
     CHECK(toast.points > 0);
 
     // 4. Boss challenge: Blaaz without healing (fail when healed, succeed on clean run)
-    rt.w32(0x021B2E94u, 43u);  // Blaaz
+    rt.w32(kStageAddr, 43u);  // Blaaz
     t += 16; ach.tick(rt, t);
     rt.w16(kPmBase + 0x02u, 60u);  // took damage
     t += 16; ach.tick(rt, t);
@@ -191,10 +213,10 @@ int main() {
     CHECK(!is_unlocked(ach, "scorching_earth"));
 
     // Retry Blaaz without healing:
-    rt.w32(0x021B2E94u, 13u);  // leave room
+    rt.w32(kStageAddr, 13u);  // leave room
     rt.w8(kAfBase + 3u, 0x00u);
     t += 16; ach.tick(rt, t);
-    rt.w32(0x021B2E94u, 43u);  // enter Blaaz
+    rt.w32(kStageAddr, 43u);  // enter Blaaz
     t += 16; ach.tick(rt, t);
     rt.w16(kPmBase + 0x02u, 56u);  // took damage, did NOT heal
     t += 16; ach.tick(rt, t);
@@ -203,7 +225,7 @@ int main() {
     CHECK(is_unlocked(ach, "scorching_earth"));
 
     // 5. Boss challenge: Crayk with <= 1 arrow
-    rt.w32(0x021B2E94u, 44u);  // Crayk
+    rt.w32(kStageAddr, 44u);  // Crayk
     t += 16; ach.tick(rt, t);
     rt.w16(kAmmoBase + 5u * 2u, 19u);  // 1 arrow shot
     t += 16; ach.tick(rt, t);
@@ -212,33 +234,33 @@ int main() {
     CHECK(is_unlocked(ach, "minimalist"));
 
     // 6. TotOK: Pristine Path (25:00 remaining) & Eroding Will (<= 5:30, no sand refill)
-    rt.w32(0x021B2E94u, 37u);  // TotOK
-    rt.w8(0x021B2EA6u, 0x00u); // 1F (0x2500)
-    rt.w32(0x021E2A48u, 90000u);
+    rt.w32(kStageAddr, 37u);  // TotOK
+    rt.w8(kRoomAddr, 0x00u);  // 1F (0x2500)
+    rt.w32(kHgCurAddr, 90000u);
     t += 16; ach.tick(rt, t);
-    rt.w8(0x021B2EA6u, 0x01u); // B1 (0x2501) -> starts Eroding Will timer
+    rt.w8(kRoomAddr, 0x01u);  // B1 (0x2501) -> starts Eroding Will timer
     t += 16; ach.tick(rt, t);
-    rt.w8(0x021B2EA6u, 0x11u); // B13 (0x2511) with 25:00 left and no refill!
+    rt.w8(kRoomAddr, 0x11u);  // B13 (0x2511) with 25:00 left and no refill!
     t += 16; ach.tick(rt, t);
     CHECK(is_unlocked(ach, "pristine_path"));
     CHECK(is_unlocked(ach, "eroding_will"));
 
     // 7. Bellum 1, 2, 3 + Credits (Leech Killer, Green Baron, Defender of the Seas, A Wish for Freedom)
-    rt.w32(0x021B2E94u, 49u);  // Bellum 1
+    rt.w32(kStageAddr, 49u);  // Bellum 1
     rt.w16(kPmBase + 0x02u, 60u);  // 1 heart below max (< 3 hearts)
     t += 16; ach.tick(rt, t);
-    rt.w32(0x021B2E94u, 50u);  // Bellum 2
-    rt.w8(0x021FA036u, 8u);
+    rt.w32(kStageAddr, 50u);  // Bellum 2
+    rt.w16(kPmBase + 0x06u, 8u);
     t += 16; ach.tick(rt, t);
     CHECK(is_unlocked(ach, "leech_killer"));
-    rt.w8(0x021FA036u, 6u);    // 1 hit (<= 6)
+    rt.w16(kPmBase + 0x06u, 6u);   // 1 hit (<= 6)
     t += 16; ach.tick(rt, t);
-    rt.w32(0x021B2E94u, 51u);  // Bellum 3 (Bellumbeck), FairyId_None (-1)
+    rt.w32(kStageAddr, 51u);  // Bellum 3 (Bellumbeck), FairyId_None (-1)
     t += 16; ach.tick(rt, t);
     CHECK(is_unlocked(ach, "the_green_baron"));
     rt.w16(kPmBase + 0x02u, 52u);  // took 8 quarters = 2 hearts (< 3 hearts)
     t += 16; ach.tick(rt, t);
-    rt.w8(0x021B5774u, 1u);    // defeated_bellum!
+    rt.w32(kStageAddr, 54u);  // Credits!
     t += 16; ach.tick(rt, t);
     CHECK(is_unlocked(ach, "defender_of_the_seas"));
     CHECK(is_unlocked(ach, "a_wish_for_freedom"));
