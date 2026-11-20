@@ -1,5 +1,4 @@
 package com.phrecomp.ph;
-package com.phrecomp.ph;
 
 import android.app.AlertDialog;
 import android.content.Intent;
