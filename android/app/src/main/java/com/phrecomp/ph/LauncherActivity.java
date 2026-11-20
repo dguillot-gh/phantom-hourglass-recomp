@@ -142,6 +142,10 @@ public final class LauncherActivity extends Activity {
         }
         final LinearLayout row = look.row(column);
         look.small(row, "Save file", this::saveFile);
+        look.small(row, "Trophies", () -> {
+            final File achFile = new File(getFilesDir(), "saves/achievements.txt");
+            PhAchievementsUi.showDialog(this, achFile, false, this::refresh);
+        });
         look.small(row, "Settings", () -> look.settings(prefs(), GPU_DEFAULT, this::refresh));
         look.small(row, "Game ROM", this::gameRom);
         look.note(column, LauncherLook.summary(prefs(), GPU_DEFAULT) + "  ·  Save states: in the game's ≡ menu");

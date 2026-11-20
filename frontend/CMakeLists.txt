@@ -17,7 +17,7 @@ if(ANDROID)
 
   # SDL's Android activity loads the program as libmain.so and calls its SDL_main.
   add_library(main SHARED src/main.cpp src/game_module.cpp src/ph_hooks.cpp src/ph_stick.cpp src/png.cpp src/android_bridge.cpp
-              src/gl_present.cpp src/gles_compat.cpp)
+              src/gl_present.cpp src/gles_compat.cpp src/achievements.cpp)
   target_include_directories(main PRIVATE src)
   target_compile_options(main PRIVATE -O2)
   target_link_libraries(main PRIVATE ntr_runtime ntr_common SDL3::SDL3-static android log
@@ -77,7 +77,7 @@ else()
 endif()
 
 # ---- the program ----
-add_executable(PhantomHourglass src/main.cpp src/game_module.cpp src/ph_hooks.cpp src/ph_stick.cpp src/png.cpp src/gl_present.cpp src/menu.cpp)
+add_executable(PhantomHourglass src/main.cpp src/game_module.cpp src/ph_hooks.cpp src/ph_stick.cpp src/png.cpp src/gl_present.cpp src/menu.cpp src/achievements.cpp)
 target_include_directories(PhantomHourglass PRIVATE src)
 set_target_properties(PhantomHourglass PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 if(PH_ROM)

@@ -200,6 +200,9 @@ final class PhMenu {
         states(list);
 
         section(list, "Game");
+        final File achFile = new File(activity.getFilesDir(), "saves/achievements.txt");
+        row(list, "Achievements (" + PhAchievementsUi.summaryText(achFile, true) + ")", () ->
+                PhAchievementsUi.showDialog(activity, achFile, true, this::refresh));
         row(list, "Quit the game", () -> {
             close();
             activity.onBackPressed();

@@ -4,6 +4,10 @@
 #include <atomic>
 #include <cstdint>
 
+namespace ph {
+class Achievements;
+}
+
 namespace ph::pad {
 
 extern std::atomic<uint32_t> held;  // DS buttons held on the pad (ntr::Key bits)
@@ -29,5 +33,6 @@ extern std::atomic<int> compute;           // the compute renderer asked for (1)
 extern std::atomic<bool> compute_failed;   // the compute renderer cannot run on this phone (the OpenGL one does)
 extern std::atomic<int> fixes;             // the 3D fixes asked for (bits: 1 fewer seams, 2 stable textures); -1: no change
 extern std::atomic<int> wide_mode;         // widescreen asked for (0 off, 1 16:9, 2 21:9); -1: no change
+extern std::atomic<ph::Achievements*> achievements;  // live achievements instance for Android JNI
 
 }  // namespace ph::pad

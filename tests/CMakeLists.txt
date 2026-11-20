@@ -11,3 +11,9 @@ add_test(NAME gx COMMAND test_gx)
 add_executable(test_input test_input.cpp)
 target_include_directories(test_input PRIVATE ${PROJECT_SOURCE_DIR}/runtime/src)
 add_test(NAME input COMMAND test_input)
+
+# Local offline achievements evaluator & persistence (RetroAchievements set #14323).
+add_executable(test_achievements test_achievements.cpp ${PROJECT_SOURCE_DIR}/frontend/src/achievements.cpp)
+target_include_directories(test_achievements PRIVATE ${PROJECT_SOURCE_DIR}/frontend/src ${PROJECT_SOURCE_DIR}/runtime/include)
+target_link_libraries(test_achievements PRIVATE SDL3::Headers)
+add_test(NAME achievements COMMAND test_achievements)

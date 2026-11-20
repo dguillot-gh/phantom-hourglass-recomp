@@ -35,6 +35,10 @@ and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melo
   landscape layouts.
 - **Save and resume**: 12 save-state slots with screenshots, separate from the game's own `.sav` save. Continue resumes
   after quitting or returning from the phone background; existing game saves remain in place.
+- **Offline achievements**: 67 local achievements matching RetroAchievements set #14323 (story, items, collectibles,
+  boss challenges, minigames, and endgame), with golden unlock toasts, live progress tracking, and a dedicated
+  **Trophies** viewer on both PC (`F1` menu) and Android (launcher and in-game `≡` menu), stored locally in
+  `data/saves/achievements.txt`.
 - **Convenience features**: FPS counter, side menus on both platforms, PC fullscreen and screenshots, and fast-forward.
 
 ## Pictures

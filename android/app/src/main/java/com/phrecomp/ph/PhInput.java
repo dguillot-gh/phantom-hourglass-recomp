@@ -73,4 +73,10 @@ public final class PhInput {
 
     /** The resume state asked for is written (or the game gave no moment for it). */
     public static native boolean nativeResumeDone();
+
+    /** Tab-separated snapshot of all local achievements (header line + one line per achievement). */
+    public static native String nativeAchievementsData();
+
+    /** Reset all locally unlocked achievements. */
+    public static native void nativeResetAchievements();
 }
