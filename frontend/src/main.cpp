@@ -18,7 +18,7 @@
 //   PhantomHourglass.exe <rom.nds> [--save-file F] [--data-dir D] [--input-script S] [--exit-after-frames N]
 //                        [--fullscreen] [--unpaced] [--module M] [--read-only-save] [--renderer software|gpu|compute]
 //                        [--scale 2|4|6|8] [--continue] [--wide] [--wide21] [--textures pixels|smooth|sharp]
-//                        [--fixes 0-3] [--language auto|en|fr|es]
+//                        [--fixes 0-3] [--language auto|en|fr|de|it|es]
 #include <SDL3/SDL.h>
 #ifdef __ANDROID__
 #include <SDL3/SDL_main.h>  // (SDL's Android activity calls SDL_main in libmain.so)
@@ -183,7 +183,7 @@ const char* language_name(int lang) {
     }
 }
 
-uint8_t resolve_language(int lang) {
+uint8_t resolve_language(int lang, bool europe) {
     if (lang >= 0 && lang <= 5) return uint8_t(lang);
     int count = 0;
     if (SDL_Locale** locales = SDL_GetPreferredLocales(&count)) {
@@ -191,8 +191,9 @@ uint8_t resolve_language(int lang) {
         for (int i = 0; i < count && locales[i] && picked < 0; i++) {
             if (!locales[i]->language) continue;
             const int code = parse_language(locales[i]->language);
-            // AZEE (USA) ships English, French and Spanish; pick the first preferred locale it carries.
-            if (code == kLangEn || code == kLangFr || code == kLangEs) picked = code;
+            // Pick the first preferred locale carried by this release: AZEE (USA) has EN/FR/ES; AZEP (Europe) adds DE/IT.
+            if (code == kLangEn || code == kLangFr || code == kLangEs || (europe && (code == kLangDe || code == kLangIt)))
+                picked = code;
         }
         SDL_free(locales);
         if (picked >= 0) return uint8_t(picked);
@@ -393,6 +394,7 @@ struct Shared {
     std::mutex view_mutex;
     Settings view;
     bool menu_open = false;
+    bool europe = false;
     int menu_selected = 0;
     int menu_page = 0;
     bool video_dirty = false;
@@ -772,6 +774,7 @@ private:
             ms.fixes = view.fixes;
             ms.compute = view.compute;
             ms.language = view.language;
+            ms.europe = s_.europe;
             const int layer = view.layout == Layout::Top ? 0 : 1;  // the screen the player looks at
             menu.draw(*gl_, ms, float(w), float(h), ui, float(ph::pad::game_fps10.load()) / 10.0f,
                       [&](int slot, const ph::Rect& r) { gl_->thumbnail(slot, layer, r); });
@@ -1074,8 +1077,10 @@ int main(int argc, char** argv) {
     else std::fprintf(stderr, "audio: %s (playing without sound)\n", SDL_GetError());
 
     // ---- the game, on its own thread with a large stack (the recompiled code nests deeply) ----
+    const bool is_europe = std::strcmp(known->game_code, "AZEP") == 0;
     Shared shared;
     shared.view = settings;
+    shared.europe = is_europe;
     shared.shot_dir = data_dir / "screenshots";
     shared.state_dir = data_dir / "states";
     Host host(shared, window, audio, std::move(script), exit_after, unpaced);
@@ -1087,7 +1092,7 @@ int main(int argc, char** argv) {
     GameThreadArgs args{&shared, window, &host, std::move(rom), code, {}};
     args.options.save_data = read_file(save_path);
     args.options.console_name = "Link";
-    args.options.language = resolve_language(settings.language);
+    args.options.language = resolve_language(settings.language, is_europe);
     args.options.fps_probe = fps_probe_arg;
     args.options.video = video_for(settings);
     ph::set_wide_extra(args.options.video.wide_extra);
@@ -1179,6 +1184,7 @@ int main(int argc, char** argv) {
         ms.fixes = settings.fixes;
         ms.compute = settings.compute;
         ms.language = settings.language;
+        ms.europe = is_europe;
         return ms;
     };
     auto menu_done = [&](const ph::MenuState& ms, ph::MenuResult r) {

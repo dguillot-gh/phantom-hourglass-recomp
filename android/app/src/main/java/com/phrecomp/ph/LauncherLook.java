@@ -204,11 +204,27 @@ final class LauncherLook {
 
     // ---- settings (the ones every DS port reads at start; the in-game menu has the rest) ----
 
-    private static final String[] LANG_VALUES = {"auto", "en", "fr", "es"};
-    private static final String[] LANG_LABELS = {"Auto (system)", "English", "Français", "Español"};
+    private static final String[] USA_LANG_VALUES = {"auto", "en", "fr", "es"};
+    private static final String[] USA_LANG_LABELS = {"Auto (system)", "English", "Français", "Español"};
+    private static final String[] EUR_LANG_VALUES = {"auto", "en", "fr", "de", "it", "es"};
+    private static final String[] EUR_LANG_LABELS = {"Auto (system)", "English", "Français", "Deutsch", "Italiano", "Español"};
 
-    private static int langIndex(String code) {
-        for (int i = 0; i < LANG_VALUES.length; i++) if (LANG_VALUES[i].equals(code)) return i;
+    /** True when the installed ROM's header carries game code AZEP (Europe: En,Fr,De,Es,It). */
+    static boolean isEuropeRom(File filesDir) {
+        final File f = new File(filesDir, "rom/azee.nds");
+        if (!f.isFile() || f.length() < 16) return false;
+        try (java.io.FileInputStream in = new java.io.FileInputStream(f)) {
+            final byte[] hdr = new byte[16];
+            if (in.read(hdr) == 16) {
+                return hdr[12] == 'A' && hdr[13] == 'Z' && hdr[14] == 'E' && hdr[15] == 'P';
+            }
+        } catch (java.io.IOException ignored) {
+        }
+        return false;
+    }
+
+    private static int langIndex(String[] values, String code) {
+        for (int i = 0; i < values.length; i++) if (values[i].equals(code)) return i;
         return 0;
     }
 
@@ -229,11 +245,14 @@ final class LauncherLook {
     void settings(SharedPreferences p, boolean gpuDefault, Runnable changed) {
         final boolean gpu = p.getBoolean("gpu", gpuDefault);
         final int scale = Math.max(1, Math.min(4, p.getInt("scale", 2)));
-        final int lang = langIndex(p.getString("language", "auto"));
+        final boolean eur = isEuropeRom(a.getFilesDir());
+        final String[] langValues = eur ? EUR_LANG_VALUES : USA_LANG_VALUES;
+        final String[] langLabels = eur ? EUR_LANG_LABELS : USA_LANG_LABELS;
+        final int lang = langIndex(langValues, p.getString("language", "auto"));
         String[] items = {
                 "Renderer: " + (gpu ? "GPU" : "Software"),
                 "Resolution: " + scale + "×" + (gpu ? "" : " (GPU only)"),
-                "Language: " + LANG_LABELS[lang],
+                "Language: " + langLabels[lang],
                 (p.getBoolean("smooth", false) ? "✓ " : "   ") + "Smooth picture",
                 (p.getBoolean("stretch", false) ? "✓ " : "   ") + "Stretch to fill the screen",
                 (p.getBoolean("portrait", false) ? "✓ " : "   ") + "Hold the phone upright (both screens stacked)",
@@ -256,9 +275,9 @@ final class LauncherLook {
                     return;
                 }
                 case 2: {
-                    dialog().setTitle("Language").setSingleChoiceItems(LANG_LABELS, lang, (x, which) -> {
+                    dialog().setTitle("Language").setSingleChoiceItems(langLabels, lang, (x, which) -> {
                         x.dismiss();
-                        p.edit().putString("language", LANG_VALUES[which]).apply();
+                        p.edit().putString("language", langValues[which]).apply();
                         changed.run();
                         settings(p, gpuDefault, changed);
                     }).setNegativeButton("Back", null).show();
