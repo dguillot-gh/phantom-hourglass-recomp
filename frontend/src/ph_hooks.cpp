@@ -1,5 +1,6 @@
 // Phantom Hourglass's hooks (frontend/config/<code>/hooks.txt): the NitroSDK routines the runtime replaces.
 #include "ph_hooks.hpp"
+#include "ph_text.hpp"
 
 #include <atomic>
 #include <cstdint>
@@ -63,6 +64,13 @@ void* find_hook(const char* name) {
         {"ntr_nitro_save_context", reinterpret_cast<void*>(&ntr_nitro_save_context)},
         {"ntr_nitro_load_context", reinterpret_cast<void*>(&ntr_nitro_load_context)},
         {"ntr_nitro_init_context", reinterpret_cast<void*>(&ntr_nitro_init_context)},
+        {"ph_text_obj_init", reinterpret_cast<void*>(&ph_text_obj_init)},
+        {"ph_text_obj_deinit", reinterpret_cast<void*>(&ph_text_obj_deinit)},
+        {"ph_text_clear", reinterpret_cast<void*>(&ph_text_clear)},
+        {"ph_text_clear_area", reinterpret_cast<void*>(&ph_text_clear_area)},
+        {"ph_text_draw_char", reinterpret_cast<void*>(&ph_text_draw_char)},
+        {"ph_text_obj_draw", reinterpret_cast<void*>(&ph_text_obj_draw)},
+        {"ph_text_oam_flush", reinterpret_cast<void*>(&ph_text_oam_flush)},
     };
     for (const auto& h : kHooks)
         if (std::strcmp(h.name, name) == 0) return h.fn;

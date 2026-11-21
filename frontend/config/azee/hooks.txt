@@ -16,3 +16,12 @@ main 02005bfc before ph_perspective_aspect      # G3i_PerspectiveW_
 
 # IRQ dispatch: enters OS_IrqHandler_ThreadSwitch explicitly (game/src/ph_hooks.cpp).
 itcm 01ffa48c replace ph_os_irq_handler        # OS_IrqHandler
+
+# Optional HD vector text (frontend/src/ph_text.cpp): captures OBJ text canvases and draws crisp TrueType glyphs.
+main 0203dcb8 before  ph_text_obj_init         # UnkStruct_0203dae0::Init
+main 0203ddb8 before  ph_text_obj_deinit       # UnkStruct_0203dae0::Deinit
+main 020331c0 before  ph_text_clear            # UnkStruct_02032f0c::vfunc_10 (CharCanvas clear)
+main 020294c4 before  ph_text_clear_area       # NNS_G2dCharCanvasClearArea
+main 020296e0 instead ph_text_draw_char        # NNS_G2dCharCanvasDrawChar
+main 0203e16c before  ph_text_obj_draw         # UnkStruct_0203dae0::Draw
+main 020249dc before  ph_text_oam_flush        # NNS_G2dApplyOamManagerToProxy

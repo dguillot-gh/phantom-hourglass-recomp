@@ -8,10 +8,12 @@
 
 #include <cstdint>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "layout.hpp"
 #include "ntr/runtime.hpp"
+#include "ph_text.hpp"
 
 namespace ph {
 
@@ -35,6 +37,8 @@ public:
     void begin(int width, int height);  // window pixels
     // Layer 0 top, 1 bottom. `wide`: a widescreen picture's wide screen is shown whole (else its middle 256 pixels).
     void screen(const ntr::Frame& frame, int layer, const Rect& where, bool smooth, bool wide = false);
+    // Optional HD vector text overlay for layer (0 top, 1 bottom), aligned to `where` (and any widescreen HUD moves).
+    void draw_hd_text(int layer, const Rect& where, int wide_extra, const HudMove* hud = nullptr, int hud_count = 0);
     void fill(const Rect& where, uint32_t argb);
     // 8x8 characters at `size` pixels each; returns the width drawn.
     float text(float x, float y, float size, const std::string& s, uint32_t argb);
@@ -49,13 +53,25 @@ public:
     bool read_screens(const ntr::Frame& frame, std::vector<uint32_t>& out, int& width, int& height);
 
 private:
+    struct HdAtlasGlyph {
+        float u0 = 0, v0 = 0, u1 = 0, v1 = 0;
+        int w = 0, h = 0, xoff = 0, yoff = 0;
+        bool empty = true;
+    };
     void quad(const Rect& r, float u0, float v0, float u1, float v1);
+    void reset_hd_atlas(float px_height);
+    const HdAtlasGlyph* get_hd_glyph(uint16_t codepoint);
 
     SDL_Window* window_ = nullptr;
     SDL_GLContext context_ = nullptr;
     std::string version_;
     static constexpr int kThumbLayers = 24;
-    unsigned program_ = 0, vao_ = 0, vbo_ = 0, soft_tex_ = 0, font_tex_ = 0, read_fbo_ = 0, thumb_tex_ = 0;
+    static constexpr int kHdAtlasSize = 1024;
+    unsigned program_ = 0, vao_ = 0, vbo_ = 0, soft_tex_ = 0, font_tex_ = 0, hd_font_tex_ = 0, read_fbo_ = 0, thumb_tex_ = 0;
+    float hd_atlas_px_ = 0.0f;
+    int hd_pen_x_ = 1, hd_pen_y_ = 1, hd_row_h_ = 0;
+    std::unordered_map<uint16_t, HdAtlasGlyph> hd_glyphs_;
+    std::vector<HdGlyph> hd_scratch_;
     mutable unsigned checked_frame_texture_ = 0;
     mutable bool checked_frame_texture_valid_ = true;
     int u_view_ = -1, u_mode_ = -1, u_layer_ = -1, u_color_ = -1, u_tex_ = -1, u_font_ = -1;

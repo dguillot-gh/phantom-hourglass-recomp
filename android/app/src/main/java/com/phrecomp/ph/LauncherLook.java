@@ -234,6 +234,7 @@ final class LauncherLook {
         StringBuilder b = new StringBuilder(gpu ? "GPU" : "Software");
         if (gpu) b.append(" · ").append(Math.max(1, Math.min(4, p.getInt("scale", 2)))).append("×");
         if (p.getBoolean("smooth", false)) b.append(" · smooth");
+        if (p.getBoolean("hd_text", false)) b.append(" · HD text");
         if (p.getBoolean("stretch", false)) b.append(" · stretched");
         b.append(p.getBoolean("portrait", false) ? " · upright" : " · sideways");
         String lang = p.getString("language", "auto");
@@ -254,12 +255,13 @@ final class LauncherLook {
                 "Resolution: " + scale + "×" + (gpu ? "" : " (GPU only)"),
                 "Language: " + langLabels[lang],
                 (p.getBoolean("smooth", false) ? "✓ " : "   ") + "Smooth picture",
+                (p.getBoolean("hd_text", false) ? "✓ " : "   ") + "HD dialogue text",
                 (p.getBoolean("stretch", false) ? "✓ " : "   ") + "Stretch to fill the screen",
                 (p.getBoolean("portrait", false) ? "✓ " : "   ") + "Hold the phone upright (both screens stacked)",
                 "Choose background image…",
                 hasCustomBackground() ? "Use the game's cover again" : null,
         };
-        int n = items[7] == null ? 7 : 8;
+        int n = items[8] == null ? 8 : 9;
         String[] shown = java.util.Arrays.copyOf(items, n);
         dialog().setTitle("Settings").setItems(shown, (d, w) -> {
             switch (w) {
@@ -284,10 +286,11 @@ final class LauncherLook {
                     return;
                 }
                 case 3: p.edit().putBoolean("smooth", !p.getBoolean("smooth", false)).apply(); break;
-                case 4: p.edit().putBoolean("stretch", !p.getBoolean("stretch", false)).apply(); break;
-                case 5: p.edit().putBoolean("portrait", !p.getBoolean("portrait", false)).apply(); break;
-                case 6: pickBackground(); return;
-                case 7: clearBackground(); changed.run(); return;
+                case 4: p.edit().putBoolean("hd_text", !p.getBoolean("hd_text", false)).apply(); break;
+                case 5: p.edit().putBoolean("stretch", !p.getBoolean("stretch", false)).apply(); break;
+                case 6: p.edit().putBoolean("portrait", !p.getBoolean("portrait", false)).apply(); break;
+                case 7: pickBackground(); return;
+                case 8: clearBackground(); changed.run(); return;
                 default: return;
             }
             changed.run();

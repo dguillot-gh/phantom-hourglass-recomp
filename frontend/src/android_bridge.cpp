@@ -34,6 +34,10 @@ extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetSmooth(J
     ph::pad::smooth.store(on != JNI_FALSE ? 1 : 0);
 }
 
+extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetHdText(JNIEnv*, jclass, jboolean on) {
+    ph::pad::hd_text.store(on != JNI_FALSE ? 1 : 0);
+}
+
 extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetFps(JNIEnv*, jclass, jboolean on) {
     ph::pad::fps.store(on != JNI_FALSE);
 }
