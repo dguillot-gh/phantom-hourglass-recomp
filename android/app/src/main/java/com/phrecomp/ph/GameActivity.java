@@ -55,6 +55,8 @@ public class GameActivity extends SDLActivity {
         args.add(textures[Math.max(0, Math.min(2, prefs.getInt("textures", 0)))]);
         args.add("--fixes");
         args.add("0");
+        args.add("--language");
+        args.add(prefs.getString("language", "auto"));
         return args.toArray(new String[0]);
     }
 

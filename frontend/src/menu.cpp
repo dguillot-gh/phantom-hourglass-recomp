@@ -13,9 +13,11 @@ constexpr uint32_t kShade = 0x55000000, kPanel = 0xF0181820, kRow = 0xFF2A2A34, 
                    kAccent = 0xFF8AB4FF, kWhite = 0xFFFFFFFF, kHint = 0xFF9090A0, kOff = 0xFF606068,
                    kEmpty = 0xFF121218;
 
-enum RowId { kScreen, kRenderer, kResolution, kTextures, kFixes, kPicture, kSize, kWide, kFps, kFullscreen, kStick, kContinue, kQuit,
-             kRowCount };
+enum RowId { kScreen, kRenderer, kResolution, kTextures, kFixes, kPicture, kSize, kWide, kFps, kFullscreen, kStick, kLanguage,
+             kContinue, kQuit, kRowCount };
 constexpr int kScales[] = {2, 4, 6, 8};
+constexpr int kUsaLanguages[] = {-1, 1, 2, 5};        // Auto, English, French, Spanish (AZEE)
+constexpr int kEurLanguages[] = {-1, 1, 2, 3, 4, 5};  // Auto, English, French, German, Italian, Spanish (AZEP)
 constexpr int kColumns = 4;  // of the save state slots
 
 }  // namespace
@@ -58,6 +60,19 @@ Menu::Geometry Menu::geometry(const MenuState& s, float win_w, float win_h, floa
                {true, true, true, true, true}, {}, {}};
     r[kFullscreen] = {"Fullscreen", {"Off", "On"}, s.fullscreen ? 1 : 0, {true, true}, {}, {}};
     r[kStick] = {"Gamepad's left stick", {"D-pad", "Analog"}, s.stick ? 1 : 0, {true, true}, {}, {}};
+    {
+        const int* codes = s.europe ? kEurLanguages : kUsaLanguages;
+        const int count = s.europe ? 6 : 4;
+        int chosen = -1;
+        for (int i = 0; i < count; i++)
+            if (codes[i] == s.language) chosen = i;
+        if (s.europe)
+            r[kLanguage] = {"Language (restart)", {"Auto", "EN", "FR", "DE", "IT", "ES"}, chosen,
+                            {true, true, true, true, true, true}, {}, {}};
+        else
+            r[kLanguage] = {"Language (restart)", {"Auto", "EN", "FR", "ES"}, chosen,
+                            {true, true, true, true}, {}, {}};
+    }
     r[kContinue] = {"", {s.resume_time.empty() ? std::string("Continue: nothing yet") : "Continue from " + s.resume_time},
                     -1, {!s.resume_time.empty()}, {}, {}};
     r[kQuit] = {"", {"Quit the game"}, -1, {true}, {}, {}};
@@ -129,6 +144,7 @@ MenuResult Menu::choose(int row, int choice, MenuState& s) {
             break;
         case kFullscreen: s.fullscreen = choice == 1; break;
         case kStick: s.stick = choice == 1; break;
+        case kLanguage: s.language = (s.europe ? kEurLanguages : kUsaLanguages)[choice]; break;
         case kContinue: return s.resume_time.empty() ? MenuResult::None : MenuResult::Continue;
         case kQuit: return MenuResult::Quit;
         default: return MenuResult::None;

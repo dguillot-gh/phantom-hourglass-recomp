@@ -200,6 +200,19 @@ final class PhMenu {
         states(list);
 
         section(list, "Game");
+        list.addView(label("Language", "Takes effect next time you start from the title screen (not Continue)."));
+        final boolean eur = LauncherLook.isEuropeRom(activity.getFilesDir());
+        final String[] langValues = eur ? new String[] {"auto", "en", "fr", "de", "it", "es"}
+                                        : new String[] {"auto", "en", "fr", "es"};
+        final String[] langChips = eur ? new String[] {"Auto", "EN", "FR", "DE", "IT", "ES"}
+                                       : new String[] {"Auto", "EN", "FR", "ES"};
+        final String langNow = prefs.getString("language", "auto");
+        int langChosen = 0;
+        for (int i = 0; i < langValues.length; i++) if (langValues[i].equals(langNow)) langChosen = i;
+        chips(list, langChips, langChosen, i -> {
+            prefs.edit().putString("language", langValues[i]).apply();
+            refresh();
+        }, null);
         row(list, "Quit the game", () -> {
             close();
             activity.onBackPressed();

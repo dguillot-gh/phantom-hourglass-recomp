@@ -37,6 +37,8 @@ struct MenuState {
     int textures = 0;          // the 3D's textures (GPU renderer): 0 the DS's pixels, 1 smooth, 2 sharp
     int fixes = 0;             // 3D fixes, bits: 1 fewer seams (GPU renderer), 2 stable textures
     bool compute = false;      // with gpu: the compute-shader renderer (texture filtering is unavailable)
+    int language = -1;         // DS firmware language: -1 auto (system locale), 1 EN, 2 FR, 3 DE, 4 IT, 5 ES
+    bool europe = false;       // AZEP (Europe) ROM: also carries German and Italian
 };
 
 enum class MenuResult { None, Changed, Quit, SaveState, LoadState, Continue };

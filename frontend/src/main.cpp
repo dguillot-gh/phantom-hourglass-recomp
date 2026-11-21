@@ -18,7 +18,7 @@
 //   PhantomHourglass.exe <rom.nds> [--save-file F] [--data-dir D] [--input-script S] [--exit-after-frames N]
 //                        [--fullscreen] [--unpaced] [--module M] [--read-only-save] [--renderer software|gpu|compute]
 //                        [--scale 2|4|6|8] [--continue] [--wide] [--wide21] [--textures pixels|smooth|sharp]
-//                        [--fixes 0-3]
+//                        [--fixes 0-3] [--language auto|en|fr|de|it|es]
 #include <SDL3/SDL.h>
 #ifdef __ANDROID__
 #include <SDL3/SDL_main.h>  // (SDL's Android activity calls SDL_main in libmain.so)
@@ -149,6 +149,58 @@ bool write_file_atomic(const fs::path& p, const std::vector<uint8_t>& data) {
     return !ec;
 }
 
+// ---- firmware language (DS UserData.Settings bits 0..2): -1 auto (system locale, else English) ---------------------
+constexpr int kLangAuto = -1;
+constexpr int kLangJa = 0, kLangEn = 1, kLangFr = 2, kLangDe = 3, kLangIt = 4, kLangEs = 5;
+
+// Parses "auto", ISO-639 codes ("en", "fr", "es", "ja", "de", "it"), full names or DS codes 0-5; returns -2 if unknown.
+int parse_language(std::string s) {
+    while (!s.empty() && std::isspace(static_cast<unsigned char>(s.back()))) s.pop_back();
+    size_t start = 0;
+    while (start < s.size() && std::isspace(static_cast<unsigned char>(s[start]))) start++;
+    s.erase(0, start);
+    for (char& c : s) c = char(std::tolower(static_cast<unsigned char>(c)));
+    if (s == "auto") return kLangAuto;
+    if (s == "ja" || s == "jp" || s == "japanese" || s == "0") return kLangJa;
+    if (s == "en" || s == "english" || s == "1") return kLangEn;
+    if (s == "fr" || s == "french" || s == "2") return kLangFr;
+    if (s == "de" || s == "german" || s == "3") return kLangDe;
+    if (s == "it" || s == "italian" || s == "4") return kLangIt;
+    if (s == "es" || s == "spanish" || s == "5") return kLangEs;
+    return -2;
+}
+
+const char* language_name(int lang) {
+    switch (lang) {
+        case kLangAuto: return "auto";
+        case kLangJa: return "ja";
+        case kLangEn: return "en";
+        case kLangFr: return "fr";
+        case kLangDe: return "de";
+        case kLangIt: return "it";
+        case kLangEs: return "es";
+        default: return "en";
+    }
+}
+
+uint8_t resolve_language(int lang, bool europe) {
+    if (lang >= 0 && lang <= 5) return uint8_t(lang);
+    int count = 0;
+    if (SDL_Locale** locales = SDL_GetPreferredLocales(&count)) {
+        int picked = -1;
+        for (int i = 0; i < count && locales[i] && picked < 0; i++) {
+            if (!locales[i]->language) continue;
+            const int code = parse_language(locales[i]->language);
+            // Pick the first preferred locale carried by this release: AZEE (USA) has EN/FR/ES; AZEP (Europe) adds DE/IT.
+            if (code == kLangEn || code == kLangFr || code == kLangEs || (europe && (code == kLangDe || code == kLangIt)))
+                picked = code;
+        }
+        SDL_free(locales);
+        if (picked >= 0) return uint8_t(picked);
+    }
+    return uint8_t(kLangEn);
+}
+
 // ---- settings.ini: a few key=value lines --------------------------------------------------------------------------
 struct Settings {
     Layout layout = Layout::Bottom;
@@ -166,6 +218,7 @@ struct Settings {
     int wide_mode = 1;    // 1: 16:9, 2: 21:9
     int textures = 0;     // the 3D's textures with the GPU renderer: 0 the DS's pixels, 1 smooth, 2 sharp
     int fixes = 0;        // 3D fixes, bits: 1 fewer seams (GPU renderer's better polygons), 2 stable textures (no warp)
+    int language = kLangAuto;  // DS firmware language: -1 auto (system locale), 0-5 explicit DS code
 };
 
 Settings load_settings(const fs::path& p) {
@@ -190,6 +243,10 @@ Settings load_settings(const fs::path& p) {
         else if (k == "wide_mode") s.wide_mode = std::clamp(std::atoi(v.c_str()), 1, 2);
         else if (k == "textures") s.textures = std::clamp(std::atoi(v.c_str()), 0, 2);
         else if (k == "fixes") s.fixes = std::clamp(std::atoi(v.c_str()), 0, 3);
+        else if (k == "language") {
+            const int parsed = parse_language(v);
+            if (parsed >= kLangAuto) s.language = parsed;
+        }
     }
     if (std::find(std::begin(kScales), std::end(kScales), s.scale) == std::end(kScales)) s.scale = 4;
     return s;
@@ -214,6 +271,7 @@ void save_settings(const fs::path& p, const Settings& s) {
     f << "wide_mode=" << s.wide_mode << "\n";
     f << "textures=" << s.textures << "\n";
     f << "fixes=" << s.fixes << "\n";
+    f << "language=" << language_name(s.language) << "\n";
 }
 
 ntr::VideoSettings video_for(const Settings& s) {
@@ -336,6 +394,7 @@ struct Shared {
     std::mutex view_mutex;
     Settings view;
     bool menu_open = false;
+    bool europe = false;
     int menu_selected = 0;
     int menu_page = 0;
     bool video_dirty = false;
@@ -714,6 +773,8 @@ private:
             ms.textures = view.textures;
             ms.fixes = view.fixes;
             ms.compute = view.compute;
+            ms.language = view.language;
+            ms.europe = s_.europe;
             const int layer = view.layout == Layout::Top ? 0 : 1;  // the screen the player looks at
             menu.draw(*gl_, ms, float(w), float(h), ui, float(ph::pad::game_fps10.load()) / 10.0f,
                       [&](int slot, const ph::Rect& r) { gl_->thumbnail(slot, layer, r); });
@@ -902,7 +963,7 @@ int main(int argc, char** argv) {
     bool fullscreen_arg = false, unpaced = false, read_only_save = false, continue_arg = false, wide_arg = false, wide21_arg = false;
     bool fps_probe_arg = false;
     std::string renderer_arg, textures_arg;
-    int scale_arg = 0, fixes_arg = -1;
+    int scale_arg = 0, fixes_arg = -1, language_arg = -2;
     for (int i = 1; i < argc; i++) {
         const std::string a = argv[i];
         const bool has = i + 1 < argc;
@@ -922,6 +983,13 @@ int main(int argc, char** argv) {
         else if (a == "--fps-probe") fps_probe_arg = true;
         else if (a == "--textures" && has) textures_arg = argv[++i];
         else if (a == "--fixes" && has) fixes_arg = std::atoi(argv[++i]);
+        else if (a == "--language" && has) {
+            language_arg = parse_language(argv[++i]);
+            if (language_arg < kLangAuto) {
+                std::fprintf(stderr, "unknown language %s (expected auto, en, fr, es, ja, de or it)\n", argv[i]);
+                return 2;
+            }
+        }
         else if (a == "--no-settings") {}  // (accepted: tests never write settings anyway, see below)
         else if (!a.empty() && a[0] != '-' && rom_path.empty()) rom_path = a;
         else {
@@ -966,6 +1034,7 @@ int main(int argc, char** argv) {
     if (!script_path.empty() && !load_script(script_path, script, error)) return error_box(error), 1;
 
     Settings settings = testing ? Settings{} : load_settings(settings_path);
+    if (testing) settings.language = kLangEn;  // scripted tests stay deterministic unless --language overrides it
     if (fullscreen_arg) settings.fullscreen = true;
     if (wide_arg) settings.wide = true;
     if (wide21_arg) settings.wide_mode = 2;
@@ -973,6 +1042,7 @@ int main(int argc, char** argv) {
     else if (textures_arg == "smooth") settings.textures = 1;
     else if (textures_arg == "sharp") settings.textures = 2;
     if (fixes_arg >= 0 && fixes_arg <= 3) settings.fixes = fixes_arg;
+    if (language_arg >= kLangAuto) settings.language = language_arg;
     // "opengl" = "gpu" (melonDS's OpenGL renderer), the name ST and phoneperf use.
     if (renderer_arg == "gpu" || renderer_arg == "opengl") settings.gpu = true, settings.compute = false;
     else if (renderer_arg == "compute") settings.gpu = settings.compute = true;
@@ -1007,8 +1077,10 @@ int main(int argc, char** argv) {
     else std::fprintf(stderr, "audio: %s (playing without sound)\n", SDL_GetError());
 
     // ---- the game, on its own thread with a large stack (the recompiled code nests deeply) ----
+    const bool is_europe = std::strcmp(known->game_code, "AZEP") == 0;
     Shared shared;
     shared.view = settings;
+    shared.europe = is_europe;
     shared.shot_dir = data_dir / "screenshots";
     shared.state_dir = data_dir / "states";
     Host host(shared, window, audio, std::move(script), exit_after, unpaced);
@@ -1020,10 +1092,12 @@ int main(int argc, char** argv) {
     GameThreadArgs args{&shared, window, &host, std::move(rom), code, {}};
     args.options.save_data = read_file(save_path);
     args.options.console_name = "Link";
+    args.options.language = resolve_language(settings.language, is_europe);
     args.options.fps_probe = fps_probe_arg;
     args.options.video = video_for(settings);
     ph::set_wide_extra(args.options.video.wide_extra);
-    std::fprintf(stderr, "save: %s (%zu bytes)\n", save_path.string().c_str(), args.options.save_data.size());
+    std::fprintf(stderr, "save: %s (%zu bytes), language: %s\n", save_path.string().c_str(), args.options.save_data.size(),
+                 language_name(args.options.language));
     SDL_PropertiesID props = SDL_CreateProperties();
     SDL_SetPointerProperty(props, SDL_PROP_THREAD_CREATE_ENTRY_FUNCTION_POINTER, reinterpret_cast<void*>(&game_thread));
     SDL_SetStringProperty(props, SDL_PROP_THREAD_CREATE_NAME_STRING, "game");
@@ -1109,12 +1183,15 @@ int main(int argc, char** argv) {
         ms.textures = settings.textures;
         ms.fixes = settings.fixes;
         ms.compute = settings.compute;
+        ms.language = settings.language;
+        ms.europe = is_europe;
         return ms;
     };
     auto menu_done = [&](const ph::MenuState& ms, ph::MenuResult r) {
         const bool video = ms.gpu != settings.gpu || ms.compute != settings.compute || ms.scale != settings.scale ||
                            ms.wide != settings.wide ||
                            ms.textures != settings.textures || ms.fixes != settings.fixes;
+        const bool lang_changed = ms.language != settings.language;
         if (r == ph::MenuResult::Quit) request_quit();
         settings.layout = ms.layout, settings.gpu = ms.gpu, settings.scale = ms.scale;
         settings.smooth = ms.smooth, settings.fps = ms.fps, settings.slot = ms.slot;
@@ -1124,9 +1201,14 @@ int main(int argc, char** argv) {
         settings.textures = ms.textures;
         settings.fixes = ms.fixes;
         settings.compute = ms.compute;
+        settings.language = ms.language;
         if (ms.fullscreen != settings.fullscreen) set_fullscreen(ms.fullscreen);
         ph::pad::fps = settings.fps;
         ph::pad::fps_corner = settings.fps_corner;
+        if (lang_changed) {
+            if (!testing) save_settings(settings_path, settings);
+            shared.say("Language applies on next launch (not Continue)", 5000);
+        }
         if (r == ph::MenuResult::SaveState) shared.state_save = settings.slot;
         if (r == ph::MenuResult::LoadState) {  // (back to the game to see it)
             shared.state_load = settings.slot;
