@@ -66,7 +66,7 @@ typedef struct NtrOverlayInfo {
  * links against nothing. Its one exported function, ntr_game_load, is given the runtime's services and the game's
  * hooks by the host, and returns the tables of recompiled functions. Bump NTR_ABI_VERSION whenever this interface or
  * the generated code's meaning changes: a module built for another version is refused (and rebuilt by setup). */
-#define NTR_ABI_VERSION 1u
+#define NTR_ABI_VERSION 2u
 
 #define NTR_RUNTIME_SERVICES(X) \
     X(uint32_t, read32_slow, (NtrCpu* c, uint32_t addr)) \
@@ -110,6 +110,7 @@ typedef struct NtrHostApi {
 /* What a loaded module provides: one entry per recompiled function and per overlay. */
 typedef struct NtrGameInfo {
     uint32_t abi;
+    const char* game_code;
     const NtrFuncEntry* functions;
     size_t function_count;
     const NtrOverlayInfo* overlays;

@@ -868,7 +868,8 @@ EmitStats emit_c(const Program& program, const Analysis& analysis, const std::fi
         for (const std::string& hk : instead_hook_names) t << "int (*ntr_hook_" << hk << ")(NtrCpu* c);\n";
         t << "\n#ifdef _WIN32\n#define NTR_GAME_EXPORT __declspec(dllexport)\n#else\n"
              "#define NTR_GAME_EXPORT __attribute__((visibility(\"default\")))\n#endif\n\n"
-             "static const NtrGameInfo ntr_game_info = {NTR_ABI_VERSION, ntr_recomp_functions, "
+             "static const NtrGameInfo ntr_game_info = {NTR_ABI_VERSION, \"" << program.game_code
+          << "\", ntr_recomp_functions, "
           << order.size() << ", ntr_recomp_overlays, " << ovs.size() << "};\n\n"
           << "#define NTR_COPY_SERVICE(ret, name, args) ntr_host.name = api->name;\n\n"
           << "NTR_GAME_EXPORT const NtrGameInfo* ntr_game_load(const NtrHostApi* api) {\n"

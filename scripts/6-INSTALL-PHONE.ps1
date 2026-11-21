@@ -4,9 +4,9 @@
 #   - copies a save into the app ONLY if the app has none yet: the PC game folder's (PhantomHourglass\data\saves),
 #     else your melonDS .ml1.sav. A save already on the phone is never replaced.
 #   - opens the app
-#   powershell -NoProfile -ExecutionPolicy Bypass -File 6-INSTALL-PHONE.ps1 [-DryRun]
+#   powershell -NoProfile -ExecutionPolicy Bypass -File 6-INSTALL-PHONE.ps1 [-Region usa|eur] [-Rom <path>] [-DryRun]
 [CmdletBinding()]
-param([switch] $DryRun)
+param([string] $Region = '', [string] $Rom = '', [switch] $DryRun)
 . (Join-Path $PSScriptRoot 'ph-common.ps1')
 
 $apk = Join-Path $ApkDir 'PhantomHourglass-latest.apk'
@@ -50,16 +50,22 @@ function Push-Into-App([string] $local, [string] $dest) {
     Adb @('shell', "run-as $Package mkdir -p $dir && cat $tmp | run-as $Package sh -c 'cat > $dest'; rm -f $tmp") | Out-Null
 }
 
-$rom = Find-Rom
-if ($DryRun -or -not (Has-File 'files/rom/azee.nds')) {
+$rom = Find-Rom -RomPath $Rom -Region $Region
+$romCode = Get-RomCode $rom
+$localSha1 = (Get-FileHash -Algorithm SHA1 -LiteralPath $rom).Hash.ToLower()
+$phoneSha1 = if (-not $DryRun -and (Has-File 'files/rom/azee.nds')) {
+    ((In-App 'sha1sum files/rom/azee.nds') -split '\s+')[0].ToLower()
+} else { '' }
+if ($DryRun -or $phoneSha1 -ne $localSha1) {
     Push-Into-App $rom 'files/rom/azee.nds'
     Step 'ROM copied into the app'
 } else {
-    Step 'the app has the ROM already'
+    Step 'the app has the matching ROM already'
 }
 
-$pcSave = Join-Path $GameDir 'data\saves\azee.sav'
-$from = if (Test-Path $pcSave) { $pcSave } elseif (Test-Path -LiteralPath $MelonSave) { $MelonSave } else { $null }
+$pcSave = Join-Path $GameDir "data\saves\$romCode.sav"
+if (-not (Test-Path $pcSave)) { $pcSave = Join-Path $GameDir 'data\saves\azee.sav' }
+$from = if (Test-Path $pcSave) { $pcSave } elseif ($romCode -eq 'azee' -and (Test-Path -LiteralPath $MelonSave)) { $MelonSave } else { $null }
 if (-not $DryRun -and (Has-File 'files/saves/azee.sav')) {
     Step 'the app has a save already: kept (never replaced)'
 } elseif ($from) {

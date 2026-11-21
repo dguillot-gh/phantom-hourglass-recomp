@@ -1017,8 +1017,12 @@ int main(int argc, char** argv) {
             SDL_free(pref);
         }
     }
-    if (rom_path.empty()) rom_path = base / "rom" / "azee.nds";
-    if (save_path.empty()) save_path = data_dir / "saves" / "azee.sav";
+    if (rom_path.empty()) {
+        if (fs::exists(base / "rom" / "azep.nds", ec) && !fs::exists(base / "rom" / "azee.nds", ec))
+            rom_path = base / "rom" / "azep.nds";
+        else
+            rom_path = base / "rom" / "azee.nds";
+    }
     const fs::path settings_path = data_dir / "settings.ini";
 
     // ---- the ROM and the recompiled game ----
@@ -1026,10 +1030,20 @@ int main(int argc, char** argv) {
     if (rom.empty()) return error_box("Cannot read the game ROM: " + rom_path.string()), 1;
     const ntr::KnownRom* known = ntr::find_known_rom(ntr::sha1(rom));
     if (!known || !known->supported || !ph::select_release(known->game_code))
-        return error_box(rom_path.string() + " is not a supported Phantom Hourglass dump (USA, clean or D-pad patch)."), 1;
+        return error_box(rom_path.string() + " is not a supported Phantom Hourglass dump (USA or Europe, clean or D-pad patch)."), 1;
+    if (save_path.empty()) {
+        std::string lower_code = known->game_code;
+        for (char& ch : lower_code)
+            if (ch >= 'A' && ch <= 'Z') ch = char(ch - 'A' + 'a');
+        save_path = data_dir / "saves" / (lower_code + ".sav");
+    }
     ntr::GameCode code;
     std::string error;
     if (!ph::load_game_module(module_path, code, error)) return error_box(error), 1;
+    if (!code.game_code.empty() && code.game_code != known->game_code)
+        return error_box("The recompiled game module (" + module_path.string() + ") was built for " + code.game_code +
+                         ", not " + known->game_code + ": rebuild it (2-BUILD.ps1) with the matching ROM."),
+               1;
     std::vector<ScriptStep> script;
     if (!script_path.empty() && !load_script(script_path, script, error)) return error_box(error), 1;
 

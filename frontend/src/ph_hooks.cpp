@@ -1,4 +1,4 @@
-// Phantom Hourglass's hooks (frontend/config/azee/hooks.txt): the NitroSDK routines the runtime replaces.
+// Phantom Hourglass's hooks (frontend/config/<code>/hooks.txt): the NitroSDK routines the runtime replaces.
 #include "ph_hooks.hpp"
 
 #include <atomic>
@@ -9,12 +9,13 @@
 #include "ntr/recomp.h"
 
 namespace {
-// AZEE (USA). The decomp (zeldaret/ph) leaves these unnamed; each was matched by its instructions.
+// AZEE (USA) and AZEP (Europe). The decomp (zeldaret/ph) leaves these unnamed; each was matched by its instructions.
 struct Addresses {
     uint32_t os_irq_table;                  // OS_IRQTable (DTCM): the literal OS_IrqHandler loads
     uint32_t os_irq_handler_thread_switch;  // OS_IrqHandler_ThreadSwitch (ITCM): the LR OS_IrqHandler sets
 };
 constexpr Addresses kUsa = {0x027E0014, 0x01FFA4E4};
+constexpr Addresses kEur = {0x027E0014, 0x01FFA4E4};
 const Addresses* A = &kUsa;
 }  // namespace
 
@@ -41,9 +42,15 @@ extern "C" void ph_os_irq_handler(NtrCpu* c) { ntr::nitro::irq_handler(c, A->os_
 namespace ph {
 
 bool select_release(const std::string& game_code) {
-    if (game_code != "AZEE") return false;
-    A = &kUsa;
-    return true;
+    if (game_code == "AZEE") {
+        A = &kUsa;
+        return true;
+    }
+    if (game_code == "AZEP") {
+        A = &kEur;
+        return true;
+    }
+    return false;
 }
 
 void* find_hook(const char* name) {

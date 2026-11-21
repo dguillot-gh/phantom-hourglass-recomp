@@ -39,6 +39,8 @@ FORBIDDEN_MAGICS = [
 KNOWN_ROM_SHA1 = {
     "4c8f52dd719918bbcd46e73a8bae8628139c1b85",  # Phantom Hourglass (USA)
     "7e0d26d143992f1eee182b24f1abb9e7f038eacf",  # Phantom Hourglass (USA), D-pad patch
+    "02be55db55cf254bd064d2b3eb368b92a5b4156d",  # Phantom Hourglass (Europe)
+    "8e3bbda6056c47f06fecf1a06d9f144a19283d88",  # Phantom Hourglass (Europe), D-pad patch
 }
 
 # Marker the recompiler writes at the top of every generated file.

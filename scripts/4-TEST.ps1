@@ -9,22 +9,25 @@ param([switch] $DryRun)
 . (Join-Path $PSScriptRoot 'ph-common.ps1')
 
 $exe = Join-Path $GameDir 'PhantomHourglass.exe'
-$rom = Join-Path $GameDir 'rom\azee.nds'
+$rom = @(Get-ChildItem -Path (Join-Path $GameDir 'rom') -Filter '*.nds' -File -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
+if (-not $rom) { $rom = Join-Path $GameDir 'rom\azee.nds' }
 if (-not (Test-Path $exe) -or -not (Test-Path $rom)) {
     if ($DryRun) { Step "no game folder yet ($GameDir): 3-MAKE-GAME-FOLDER.ps1 makes it" }
     else { Fail "no game folder yet: run 3-MAKE-GAME-FOLDER.ps1 first ($GameDir)" }
 }
+$romCode = if (Test-Path $rom) { Get-RomCode $rom } else { 'azee' }
+$saveName = "$romCode.sav"
 
 $out = Join-Path $LogDir ("test-$Stamp" + $(if ($DryRun) { '-dryrun' } else { '' }))
 $data = Join-Path $out 'data'
 New-Item -ItemType Directory -Force -Path $data | Out-Null
 # The save to start from: the game folder's, else the melonDS one -- always a copy.
 $saveArgs = @()
-$from = Join-Path $GameDir 'data\saves\azee.sav'
-if (-not (Test-Path $from)) { $from = $MelonSave }
+$from = Join-Path $GameDir "data\saves\$saveName"
+if (-not (Test-Path $from) -and $romCode -eq 'azee') { $from = $MelonSave }
 if (Test-Path -LiteralPath $from) {
-    Copy-Item -LiteralPath $from -Destination (Join-Path $out 'azee.sav')
-    $saveArgs = @('--save-file', "`"$(Join-Path $out 'azee.sav')`"")
+    Copy-Item -LiteralPath $from -Destination (Join-Path $out $saveName)
+    $saveArgs = @('--save-file', "`"$(Join-Path $out $saveName)`"")
 }
 # About 60 frames a second: logos, title, a few presses and taps on the touch screen, screenshots along the way.
 $script = Join-Path $out 'input.txt'
@@ -81,8 +84,8 @@ $gpu = Join-Path $out 'gpu'
 New-Item -ItemType Directory -Force -Path (Join-Path $gpu 'data') | Out-Null
 $gpuSave = @()
 if ($saveArgs.Count) {
-    Copy-Item -LiteralPath $from -Destination (Join-Path $gpu 'azee.sav')
-    $gpuSave = @('--save-file', "`"$(Join-Path $gpu 'azee.sav')`"")
+    Copy-Item -LiteralPath $from -Destination (Join-Path $gpu $saveName)
+    $gpuSave = @('--save-file', "`"$(Join-Path $gpu $saveName)`"")
 }
 Set-Content -Path (Join-Path $gpu 'input.txt') -Encoding ASCII -Value @(
     "600 shot $gpu\gpu-title-4x.png",
@@ -108,8 +111,8 @@ if (Test-Path $glesExe) {
     New-Item -ItemType Directory -Force -Path (Join-Path $es 'data') | Out-Null
     $esSave = @()
     if ($saveArgs.Count) {
-        Copy-Item -LiteralPath $from -Destination (Join-Path $es 'azee.sav')
-        $esSave = @('--save-file', "`"$(Join-Path $es 'azee.sav')`"")
+        Copy-Item -LiteralPath $from -Destination (Join-Path $es $saveName)
+        $esSave = @('--save-file', "`"$(Join-Path $es $saveName)`"")
     }
     Set-Content -Path (Join-Path $es 'input.txt') -Encoding ASCII -Value @(
         "600 shot $es\gles-title-4x.png",

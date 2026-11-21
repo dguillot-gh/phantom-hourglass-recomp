@@ -37,6 +37,7 @@ const Module* Program::module_by_name(const std::string& name) const {
 
 Program load_program(const ntr::Rom& rom) {
     Program p;
+    p.game_code = rom.header().game_code;
     ntr::Arm9Image arm9 = rom.load_arm9();
 
     Module main;
