@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "achievements.hpp"
 #include "layout.hpp"
 
 namespace ph {
@@ -40,19 +41,25 @@ struct MenuState {
     int language = -1;         // DS firmware language: -1 auto (system locale), 1 EN, 2 FR, 3 DE, 4 IT, 5 ES
     bool europe = false;       // AZEP (Europe) ROM: also carries German and Italian
     bool hd_text = false;      // HD vector dialogue text (Inter Bold TrueType font)
+    AchievementsSnapshot achievements{};
 };
 
-enum class MenuResult { None, Changed, Quit, SaveState, LoadState, Continue };
+enum class MenuResult { None, Changed, Quit, SaveState, LoadState, Continue, ResetAchievements };
 
 class Menu {
 public:
     bool open = false;
-    int page = 0;  // 0 Settings, 1 Save states
+    int page = 0;  // 0 Settings, 1 Save states, 2 Achievements
     int selected = 0;
+    int ach_filter = 0;  // 0 All, 1 Unlocked, 2 Locked
+    int ach_scroll = 0;
+    bool ach_reset_confirm = false;
 
     MenuResult key(SDL_Scancode key, MenuState& s);
     // A click at window pixel (x, y); a click beside the panel closes it.
     MenuResult click(float x, float y, float win_w, float win_h, float ui, MenuState& s);
+    // Mouse wheel scroll (positive y = scroll up).
+    void wheel(float delta_y, const MenuState& s);
     // `thumbnail(slot, where)` draws a slot's picture (slot 0-11).
     template <class Thumb>
     void draw(GlPresenter& gl, const MenuState& s, float win_w, float win_h, float ui, float fps, Thumb thumbnail) const {
@@ -75,11 +82,15 @@ private:
     };
     struct Geometry {
         Rect panel;
-        std::array<Rect, 2> tabs;
+        std::array<Rect, 3> tabs;
         std::vector<Row> rows;                  // Settings
         std::array<Rect, kStateSlots> cards{};  // Save states: each slot's card, its picture, the save/load buttons
         std::array<Rect, kStateSlots> thumbs{};
         std::array<Rect, 2> buttons{};
+        // Achievements page: filter chips (All/Unlocked/Locked), scroll buttons (Prev/Next), Reset button
+        std::array<Rect, 3> ach_filters{};
+        std::array<Rect, 3> ach_buttons{};      // 0 Prev, 1 Next, 2 Reset
+        Rect ach_list{};
     };
     static Geometry geometry(const MenuState& s, float win_w, float win_h, float ui);
     static Rect panel(float win_w, float win_h, float ui);

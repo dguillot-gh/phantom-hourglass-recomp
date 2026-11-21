@@ -40,6 +40,10 @@ and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melo
 - **Language selector**: choose Auto (system locale), English, French, or Spanish (plus German and Italian on European
   dumps) from the PC menu, Android settings, `settings.ini`, or `--language` (takes effect on next launch from the
   title screen).
+- **Offline achievements**: 67 local achievements matching RetroAchievements set #14323 (story, items, collectibles,
+  boss challenges, minigames, and endgame), with golden unlock toasts, live progress tracking, and a dedicated
+  **Trophies** viewer on both PC (`F1` menu) and Android (launcher and in-game `≡` menu), stored locally in
+  `data/saves/achievements.txt`.
 - **Convenience features**: FPS counter, side menus on both platforms, PC fullscreen and screenshots, and fast-forward.
 
 ## Pictures

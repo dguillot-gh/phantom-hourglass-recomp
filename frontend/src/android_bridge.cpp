@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <thread>
 
+#include "achievements.hpp"
 #include "pad_input.hpp"
 
 extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetButtons(JNIEnv*, jclass, jint held) {
@@ -102,6 +103,27 @@ extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeRequestResu
 
 extern "C" JNIEXPORT jboolean JNICALL Java_com_phrecomp_ph_PhInput_nativeResumeDone(JNIEnv*, jclass) {
     return ph::pad::resume_done.load() && !ph::pad::resume_request.load() ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jstring JNICALL Java_com_phrecomp_ph_PhInput_nativeAchievementsData(JNIEnv* env, jclass) {
+    std::string out;
+    if (ph::Achievements* ach = ph::pad::achievements.load()) {
+        const ph::AchievementsSnapshot snap = ach->snapshot();
+        out.reserve(snap.items.size() * 120);
+        out += std::to_string(snap.unlocked_count) + "\t" + std::to_string(snap.total_count) + "\t" +
+               std::to_string(snap.unlocked_points) + "\t" + std::to_string(snap.total_points) + "\n";
+        for (const auto& a : snap.items) {
+            out += std::to_string(a.number) + "\t" + a.id + "\t" + a.title + "\t" + a.description + "\t" +
+                   std::to_string(a.points) + "\t" + ph::Achievements::category_name(a.category) + "\t" +
+                   (a.unlocked ? "1" : "0") + "\t" + std::to_string(a.progress_cur) + "\t" +
+                   std::to_string(a.progress_max) + "\n";
+        }
+    }
+    return env->NewStringUTF(out.c_str());
+}
+
+extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeResetAchievements(JNIEnv*, jclass) {
+    if (ph::Achievements* ach = ph::pad::achievements.load()) ach->reset_all();
 }
 
 namespace {

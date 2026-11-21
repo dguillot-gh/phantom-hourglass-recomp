@@ -44,6 +44,7 @@
 #include <string>
 #include <vector>
 
+#include "achievements.hpp"
 #include "game_module.hpp"
 #include "layout.hpp"
 #include "ntr/rom.hpp"
@@ -86,6 +87,7 @@ std::atomic<bool> compute_failed{false};
 std::atomic<bool> resume_done{false};
 std::atomic<int> wide_mode{-1};
 std::atomic<int> hd_text{-1};
+std::atomic<ph::Achievements*> achievements{nullptr};
 }  // namespace ph::pad
 
 namespace {
@@ -402,7 +404,11 @@ struct Shared {
     bool europe = false;
     int menu_selected = 0;
     int menu_page = 0;
+    int menu_ach_filter = 0;
+    int menu_ach_scroll = 0;
+    bool menu_ach_reset_confirm = false;
     bool video_dirty = false;
+    ph::Achievements achievements;
     std::atomic<bool> gpu_failed{false};  // the GPU renderer could not start
     std::atomic<bool> compute_failed{false};  // the compute renderer was asked for and cannot run (the OpenGL one does)
     std::atomic<int> gl_display{0};       // 1: the game thread draws with OpenGL; -1: it cannot (phone fallback)
@@ -476,6 +482,7 @@ public:
 
     bool on_frame(const ntr::Frame& frame) override {
         const uint64_t f = ++frames_;
+        if (rt_) s_.achievements.tick(*rt_, SDL_GetTicks());
         last_ = frame;
         have_last_ = true;
         if (frame.top && frame.bottom) {
@@ -615,6 +622,7 @@ public:
         const int slot = load_slot_;
         load_slot_ = 0;
         if (ok) ph::hd_text_reset();
+        if (ok) s_.achievements.on_state_loaded();
         if (slot == kResumeSlot) return s_.say(ok ? "Continued from where you left off" : "Could not continue: " + error);
         s_.say(ok ? "Loaded slot " + std::to_string(slot) : "Slot " + std::to_string(slot) + " not loaded: " + error);
     }
@@ -669,15 +677,18 @@ private:
     // Shows the frame (and the FPS counter, a note, the PC's menu) and applies a renderer change asked for in the menu.
     void draw(const ntr::Frame& frame, bool count_game_frame = true) {
         Settings view;
-        bool menu_open, video_dirty;
-        int selected, page;
+        bool menu_open, video_dirty, ach_reset_confirm = false;
+        int selected, page, ach_filter = 0, ach_scroll = 0;
         {
             std::lock_guard<std::mutex> lock(s_.view_mutex);
             view = s_.view;
             menu_open = s_.menu_open;
             selected = s_.menu_selected;
             page = s_.menu_page;
-            (void)selected, (void)page;
+            ach_filter = s_.menu_ach_filter;
+            ach_scroll = s_.menu_ach_scroll;
+            ach_reset_confirm = s_.menu_ach_reset_confirm;
+            (void)selected, (void)page, (void)ach_filter, (void)ach_scroll, (void)ach_reset_confirm;
             video_dirty = s_.video_dirty;
             s_.video_dirty = false;
         }
@@ -764,6 +775,7 @@ private:
             gl_->fill({x - 8 * ui, float(h) - size - 28 * ui, tw + 16 * ui, size + 16 * ui}, 0xC0000000);
             gl_->text(x, float(h) - size - 20 * ui, size, note, 0xFFFFFFFF);
         }
+        s_.achievements.draw_toast(*gl_, w, h, ui, SDL_GetTicks());
 #ifndef __ANDROID__
         if (menu_open) {
             // The slots' pictures, read again when a slot changed.
@@ -783,6 +795,9 @@ private:
             menu.open = true;
             menu.page = page;
             menu.selected = selected;
+            menu.ach_filter = ach_filter;
+            menu.ach_scroll = ach_scroll;
+            menu.ach_reset_confirm = ach_reset_confirm;
             ph::MenuState ms{view.layout, view.gpu, view.scale, view.smooth, view.fps, view.fullscreen, s_.gpu_failed.load(),
                              view.slot, times_};
             ms.fps_corner = view.fps_corner;
@@ -796,6 +811,7 @@ private:
             ms.language = view.language;
             ms.europe = s_.europe;
             ms.hd_text = view.hd_text;
+            if (page == 2) ms.achievements = s_.achievements.snapshot();
             const int layer = view.layout == Layout::Top ? 0 : 1;  // the screen the player looks at
             menu.draw(*gl_, ms, float(w), float(h), ui, float(ph::pad::game_fps10.load()) / 10.0f,
                       [&](int slot, const ph::Rect& r) { gl_->thumbnail(slot, layer, r); });
@@ -1121,6 +1137,8 @@ int main(int argc, char** argv) {
     shared.europe = is_europe;
     shared.shot_dir = data_dir / "screenshots";
     shared.state_dir = data_dir / "states";
+    shared.achievements.load(data_dir / "saves" / "achievements.txt", read_only_save || testing);
+    ph::pad::achievements.store(&shared.achievements);
     Host host(shared, window, audio, std::move(script), exit_after, unpaced);
     host.set_resume(continue_arg && !testing, !testing);
 #ifdef __ANDROID__
@@ -1200,6 +1218,9 @@ int main(int argc, char** argv) {
         shared.menu_open = menu.open;
         shared.menu_selected = menu.selected;
         shared.menu_page = menu.page;
+        shared.menu_ach_filter = menu.ach_filter;
+        shared.menu_ach_scroll = menu.ach_scroll;
+        shared.menu_ach_reset_confirm = menu.ach_reset_confirm;
         menu_open = menu.open;
 #endif
         if (video) shared.video_dirty = true;
@@ -1224,6 +1245,7 @@ int main(int argc, char** argv) {
         ms.language = settings.language;
         ms.europe = is_europe;
         ms.hd_text = settings.hd_text;
+        if (menu.page == 2) ms.achievements = shared.achievements.snapshot();
         return ms;
     };
     auto menu_done = [&](const ph::MenuState& ms, ph::MenuResult r) {
@@ -1260,6 +1282,10 @@ int main(int argc, char** argv) {
         if (r == ph::MenuResult::Continue) {
             shared.state_load = kResumeSlot;
             menu.open = false;
+        }
+        if (r == ph::MenuResult::ResetAchievements) {
+            shared.achievements.reset_all();
+            shared.say("Achievements reset");
         }
         publish(video);
     };
@@ -1317,6 +1343,14 @@ int main(int argc, char** argv) {
                         ph::MenuState ms = menu_state();
                         menu_done(ms, menu.click(e.button.x * density, e.button.y * density, float(win_pw), float(win_ph),
                                                  ui, ms));
+                    }
+                    break;
+                case SDL_EVENT_MOUSE_WHEEL:
+                    if (testing) break;
+                    if (menu.open && menu.page == 2) {
+                        ph::MenuState ms = menu_state();
+                        menu.wheel(e.wheel.y, ms);
+                        publish(false);
                     }
                     break;
 #endif
@@ -1506,6 +1540,22 @@ int main(int argc, char** argv) {
             SDL_RenderDebugText(renderer, (lw - tw) / 2, lh - 22, note.c_str());
             SDL_SetRenderScale(renderer, 1, 1);
         }
+        {
+            ph::AchievementToast toast;
+            if (shared.achievements.active_toast(SDL_GetTicks(), toast)) {
+                const float k = std::max(1.0f, float(win_ph) / 360.0f);
+                const std::string line = "TROPHY: " + toast.title + " (+" + std::to_string(toast.points) + " pts)";
+                const float tw = 8.0f * float(line.size()), lw = float(win_pw) / k;
+                SDL_SetRenderScale(renderer, k, k);
+                SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+                SDL_SetRenderDrawColor(renderer, 22, 24, 34, 232);
+                const SDL_FRect box{(lw - tw) / 2 - 8, 8, tw + 16, 18};
+                SDL_RenderFillRect(renderer, &box);
+                SDL_SetRenderDrawColor(renderer, 245, 197, 66, 255);
+                SDL_RenderDebugText(renderer, (lw - tw) / 2, 13, line.c_str());
+                SDL_SetRenderScale(renderer, 1, 1);
+            }
+        }
         SDL_RenderPresent(renderer);
         if (!fresh) SDL_Delay(1);
         }
@@ -1523,6 +1573,7 @@ int main(int argc, char** argv) {
 
     shared.quit = true;
     SDL_WaitThread(thread, nullptr);
+    ph::pad::achievements.store(nullptr);
 #ifdef __ANDROID__
     if (lifecycle_watch_registered) SDL_RemoveEventWatch(watch_android_lifecycle, &shared);
 #endif

@@ -218,6 +218,9 @@ final class PhMenu {
             prefs.edit().putString("language", langValues[i]).apply();
             refresh();
         }, null);
+        final File achFile = new File(activity.getFilesDir(), "saves/achievements.txt");
+        row(list, "Achievements (" + PhAchievementsUi.summaryText(achFile, true) + ")", () ->
+                PhAchievementsUi.showDialog(activity, achFile, true, this::refresh));
         row(list, "Quit the game", () -> {
             close();
             activity.onBackPressed();
