@@ -21,9 +21,10 @@ endfunction()
 # ---- melonDS core (GPL-3.0-or-later) ----
 # Built from our own source list rather than melonDS's CMake: we need the emulation core and its renderers only
 # (no frontend, JIT or GDB stub), and the recompiled ARM9 replaces melonDS's ARM9 interpreter at run time.
-set(MELONDS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/melonDS)
+# Nix (and other out-of-tree builds) can point at an unpacked copy of the same pinned commit.
+set(MELONDS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/melonDS" CACHE PATH "Path to the melonDS source tree (default: the git submodule)")
 if(NOT EXISTS ${MELONDS_DIR}/src/NDS.cpp)
-  message(FATAL_ERROR "third_party/melonDS is missing: run `git submodule update --init --recursive`")
+  message(FATAL_ERROR "melonDS is missing at ${MELONDS_DIR}: run `git submodule update --init --recursive` or set -DMELONDS_DIR=<path>")
 endif()
 set(MS ${MELONDS_DIR}/src)
 
