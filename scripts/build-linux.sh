@@ -97,8 +97,8 @@ find_rom() {
 
 check_tools() {
   local c v
-  for c in cmake ninja clang sha1sum git; do
-    command -v "$c" >/dev/null || fail "$c is not installed (run 'nix develop' first, or install CMake >= 3.28, Ninja and clang)"
+  for c in cmake ninja sha1sum git "${CC:-gcc}" "${CXX:-g++}"; do
+    command -v "$c" >/dev/null || fail "$c is not installed (run 'nix develop' first, or install CMake >= 3.28, Ninja and GCC)"
   done
   v=$(cmake --version | head -1 | grep -Eo '[0-9]+\.[0-9]+' | head -1)
   if ! printf '%s\n%s\n' '3.28' "$v" | sort -V -C; then fail "CMake 3.28+ is required (found $v)"; fi

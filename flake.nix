@@ -34,15 +34,16 @@
       buildTools = pkgs: with pkgs; [
         cmake
         ninja
-        clang
-        lld
+        gcc
         pkg-config
         git
         python3
       ];
 
+      # GCC's wrapper knows where libstdc++ is; nixpkgs' clang-scan-deps does not when CMake uses
+      # clang for a C++20 Ninja build, so use GCC for the Nix builds.
       cmakeFlagsBase = pkgs:
-        "-DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ " +
+        "-DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ " +
         "-DFETCHCONTENT_SOURCE_DIR_SDL3=${sdl3Src pkgs} -DMELONDS_DIR=${melondsSrc pkgs}";
     in {
       packages = forAllSystems (pkgs: rec {
@@ -136,6 +137,7 @@
         default = pkgs.mkShell {
           packages = buildTools pkgs ++ sdlDeps pkgs;
           shellHook = ''
+            export CC=gcc CXX=g++
             # Use the pinned sources instead of `git submodule update` / a network fetch at configure time.
             export FETCHCONTENT_SOURCE_DIR_SDL3="${sdl3Src pkgs}"
             export MELONDS_DIR="${melondsSrc pkgs}"

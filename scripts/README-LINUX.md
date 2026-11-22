@@ -65,7 +65,7 @@ fetched from GitHub only if you are building without Nix and without that variab
 
 ## Building without Nix
 
-On a distro with CMake 3.28+, Ninja, Clang, Git and SDL3's Linux headers (X11/Wayland/audio) installed:
+On a distro with CMake 3.28+, Ninja, GCC, Git and SDL3's Linux headers (X11/Wayland/audio) installed:
 
 ```sh
 git submodule update --init --depth 1

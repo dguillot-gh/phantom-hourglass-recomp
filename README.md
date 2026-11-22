@@ -84,7 +84,7 @@ and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melo
 
   Other phones should work (Android 8 or newer, 64-bit ARM), but GPU drivers differ: if the picture looks wrong, the
   software renderer (1x, in the menu) is the safe fallback.
-- **PC:** Windows 11 and Linux (built with the Nix flake; Clang 21 on x86-64 Linux).
+- **PC:** Windows 11 and Linux (built with the Nix flake; GCC on x86-64 Linux).
 - **Status:** plays on PC, the Pixel 8 and the LG V30.
 - **Measured** (2026-11-03, this `main` build on both phones): each renderer set the way the menu does, the game
   continued from the same spot in gameplay, 20 s to settle, then 30 s of the frames the phone actually showed
