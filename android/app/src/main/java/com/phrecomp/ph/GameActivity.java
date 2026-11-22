@@ -88,11 +88,29 @@ public class GameActivity extends SDLActivity {
         runOnUiThread(this::applyOrientation);
     }
 
+    /** Ask for a 60 Hz display mode while the game is on screen. The DS runs at ~60 fps; on a 90 Hz panel a
+     *  60 fps game is otherwise shown at 45 (and unevenly on 120 Hz ones). Same resolution as the current mode;
+     *  Android switches back when the game leaves the screen, so nobody has to change a phone setting. */
+    private void prefer60Hz() {
+        if (Build.VERSION.SDK_INT < 23) return;
+        android.view.Display display = getWindowManager().getDefaultDisplay();
+        android.view.Display.Mode current = display.getMode(), best = null;
+        for (android.view.Display.Mode m : display.getSupportedModes()) {
+            if (m.getPhysicalWidth() != current.getPhysicalWidth() || m.getPhysicalHeight() != current.getPhysicalHeight()) continue;
+            if (best == null || Math.abs(m.getRefreshRate() - 60f) < Math.abs(best.getRefreshRate() - 60f)) best = m;
+        }
+        if (best == null) return;
+        WindowManager.LayoutParams lp = getWindow().getAttributes();
+        lp.preferredDisplayModeId = best.getModeId();
+        getWindow().setAttributes(lp);
+    }
+
     @Override
     protected void onCreate(Bundle state) {
         setRequestedOrientation(portrait() ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
                                            : ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        prefer60Hz();
         if (Build.VERSION.SDK_INT >= 28) {
             getWindow().getAttributes().layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
