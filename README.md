@@ -1,293 +1,116 @@
 # Phantom Hourglass Recomp
 
-A native port of **The Legend of Zelda: Phantom Hourglass** (Nintendo DS) to Windows PCs and Android phones, made by
-*static recompilation*: the game's own ARM9 code (the main program and all 62 overlays, 24,621 functions) is translated
-to C and compiled ahead of time for your machine, instead of being emulated. The rest of the console (the ARM7, graphics
-and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melonDS) core.
+A native port of **The Legend of Zelda: Phantom Hourglass** (Nintendo DS) to Windows, Linux and Android. The game's
+ARM9 code is statically recompiled to C and compiled ahead of time instead of emulated; the rest of the DS comes from
+[melonDS](https://github.com/melonDS-emu/melonDS).
 
-
-> **This repository contains no game data.** You build the game from your own legally dumped cartridge: the scripts
-> recompile your ROM on your PC, and nothing made from it is ever committed or shared. Please do not share the builds
-> you make (the game folder and the APK contain the game).
-
-## Features
-
-- **Native game code**: the ARM9 program and all 62 overlays are statically recompiled to native code; melonDS models
-  the DS hardware around it.
-- **Screen layouts**: show the touch screen, the top screen (including the sea chart), or both screens stacked.
-  Choose the DS's 4:3 shape or stretch the picture to fill the display.
-- **Renderers and resolution**: exact-resolution Software rendering, the OpenGL GPU renderer, and the Compute renderer.
-  The PC supports 2×–8× upscaling; Android supports up to 4× with Compute. The app selects a compatible renderer and
-  offers the software renderer as a fallback.
-- **Picture options**: sharp or smooth screen scaling; the GPU renderer also offers pixel, smooth, or sharp 3D texture
-  filtering. The PC menu includes optional 3D seam and texture stability fixes.
-- **HD text**: optional vector dialogue text rendering at native display resolution using the bundled Inter Bold
-  TrueType font, preserving the game's layout, colors, and special symbols on both PC and Android.
-- **Widescreen**: Compute rendering can expand the view to 16:9 or 21:9. The HUD follows the wide view and moved HUD
-  areas continue to respond to touch. At 21:9, some scenery and other elements can pop into view near the edges because
-  the game's visibility checks were designed for 4:3.
-- **Touch and controller input**: touch or mouse controls the stylus. Use keyboard, gamepad, or Android's on-screen
-  D-pad and optional A/B/X/Y, L/R, Start/Select buttons. The D-pad moves Link with the supported D-pad-patched ROM;
-  the optional analog-stick mode works with either supported ROM and with the phone or a gamepad's left stick.
-- **Microphone controls**: generated noise for shouting (M, right-stick click, or MIC) and a bundled recorded blow
-  sample for blow-sensitive interactions (N or the separate BLOW button). Hold either control while using the in-game
-  microphone interaction.
-- **Android controls**: MIC, BLOW, lid, top-screen, and rotate buttons; portrait mode stacks both screens like an open
-  DS. Toggle control groups, change their size and opacity, or move and resize each control with separate portrait and
-  landscape layouts.
-- **Save and resume**: 12 save-state slots with screenshots, separate from the game's own `.sav` save. Continue resumes
-  after quitting or returning from the phone background; existing game saves remain in place.
-- **Language selector**: choose Auto (system locale), English, French, or Spanish (plus German and Italian on European
-  dumps) from the PC menu, Android settings, `settings.ini`, or `--language` (takes effect on next launch from the
-  title screen).
-- **Offline achievements**: 67 local achievements matching RetroAchievements set #14323 (story, items, collectibles,
-  boss challenges, minigames, and endgame), with golden unlock toasts, live progress tracking, and a dedicated
-  **Trophies** viewer on both PC (`F1` menu) and Android (launcher and in-game `≡` menu), stored locally in
-  `data/saves/achievements.txt`.
-- **Convenience features**: FPS counter, side menus on both platforms, PC fullscreen and screenshots, and fast-forward.
-
-## Pictures
+> **No game data is included.** You build the game from your own dump. Please don't share the builds you make: the
+> game folder and the APK contain the game.
 
 <p>
   <img src="docs/images/pc-16x9-gpu.jpg" width="100%" alt="PC: a temple room in 16:9 with the GPU renderer at 8x">
 </p>
-<p><em>PC, GPU renderer at 8x, widescreen (16:9).</em></p>
-
 <p>
-  <img src="docs/images/pc-4x3-gpu.jpg" width="49%" alt="PC: the same room in 4:3 with the GPU renderer at 8x">
-  <img src="docs/images/pc-software.jpg" width="49%" alt="PC: the same room with the software renderer, the DS's own picture">
+  <img src="docs/images/phone-16x9-compute-4x.png" width="49%" alt="Phone: 16:9 rendering with Compute at 4x">
+  <img src="docs/images/pc-menu.jpg" width="49%" alt="PC: the side menu (F1) over the game">
 </p>
-<p><em>The same room in 4:3: the GPU renderer at 8x (left) and the software renderer, the DS's exact picture (right).</em></p>
 
-<p>
-  <img src="docs/images/pc-menu.jpg" width="70%" alt="PC: the side menu (F1) over the game">
-  <img src="docs/images/pc-save-states.jpg" width="27%" alt="PC: the save state slots, with a picture of each">
-</p>
-<p><em>The PC's side menu (F1) and its save states page.</em></p>
+## Features
 
-<p>
-  <img src="docs/images/phone-4x3-compute-4x.png" width="32%" alt="Pixel 8: 4:3 rendering with Compute at 4x">
-  <img src="docs/images/phone-16x9-compute-4x.png" width="32%" alt="Pixel 8: 16:9 rendering with Compute at 4x">
-  <img src="docs/images/phone-21x9-compute-4x.png" width="32%" alt="Pixel 8: 21:9 rendering with Compute at 4x">
-</p>
-<p><em>On a Pixel 8: Compute at the maximum 4x upscaling in 4:3, 16:9, and 21:9 modes; the 21:9 view is shown on the phone's 20:9 display.</em></p>
-<p>
-  <img src="docs/images/phone-menu.jpg" width="160" alt="Phone: the menu">
-</p>
-<p><em>The Android side menu.</em></p>
+- Software, OpenGL and Compute renderers, up to 8x on PC and 4x on Android
+- Widescreen (16:9 and 21:9) with Compute
+- HD dialogue text (vector font at screen resolution)
+- 67 offline achievements with a Trophies viewer (matching RetroAchievements set #14323)
+- 12 save-state slots, plus Continue from where you quit
+- Language selector: English, French and Spanish, plus German and Italian on Europe dumps
+- Touch, keyboard and gamepad; analog-stick movement; mic and blow buttons
+- Android: movable on-screen controls, portrait mode with both screens stacked
 
-## Tested on
-
-- **Phones:** two test phones, a high-end one and a 2017 one:
-  - **Google Pixel 8** (Tensor G3, Mali-G715, Android 14+)
-  - **LG V30** (Snapdragon 835, Adreno 540, Android 8, rooted for measuring)
-
-  Other phones should work (Android 8 or newer, 64-bit ARM), but GPU drivers differ: if the picture looks wrong, the
-  software renderer (1x, in the menu) is the safe fallback.
-- **PC:** Windows 11 and Linux (built with the Nix flake; GCC on x86-64 Linux).
-- **Status:** plays on PC, the Pixel 8 and the LG V30.
-- **Measured** (2026-11-03, this `main` build on both phones): each renderer set the way the menu does, the game
-  continued from the same spot in gameplay, 20 s to settle, then 30 s of the frames the phone actually showed
-  (Android's SurfaceFlinger: `--latency` on the V30, `--timestats` on the Pixel 8). Every run started the renderer it
-  asked for (checked in the game's log).
-
-  | Renderer | LG V30 fps | V30 1% low | Pixel 8 fps | Pixel 1% low |
-  |---|---:|---:|---:|---:|
-  | Software (1x) | 31.7 | 15 | 61.5 | 40 |
-  | OpenGL 2x | 34.4 | 20 | 61.5 | 30 |
-  | **OpenGL 4x** | **45.2** | 20 | 61.5 | 30 |
-  | Compute 2x | 15.6 | 7 | 61.4 | 30 |
-  | Compute 4x | 13.3 | 5 | 61.6 | 30 |
-  | 6x (asked for) | runs at 4x: 45.3 | 30 | runs at 4x: 61.5 | 30 |
-
-  The Pixel 8 runs every setting at full speed (~60 fps; it measures slightly over 60 on its 120 Hz display).
-  The phone app caps the resolution at 4x; asking for 6x gives 4x on both phones. 1% low = the frame rate of the
-  slowest 1% of frames.
-
-  **Best settings:** **OpenGL 4x** on older phones like the V30; **Compute** (the more exact renderer) on fast phones
-  like the Pixel 8. On the V30, 4x runs faster than 2x: the heavier load makes the phone raise its CPU and GPU clocks
-  (fast cores ~1.7 GHz and the GPU at 710 MHz at 4x, against ~1.2 GHz and 257 MHz at 2x, measured with the
-  `phoneperf` tool). Earlier the same day `phoneperf` measured 59.8 fps at OpenGL 4x on the V30 with a test build
-  (`feature/opengl`: the same fixes plus measuring code and an ARM7 timing change that is not on `main`); the gap to the
-  45 here is not explained yet (different build, and a different way of counting frames).
-- **Known issue:** in **Software** mode the bottom of the screen flickers on both phones (seen 2026-11-03 during the
-  measurements above); OpenGL and Compute are not affected. Not yet investigated.
-- **OpenGL on phones** (2026-11-03): OpenGL is a menu choice next to Software and Compute. Fixed on the way:
-  flickering cut grass (melonDS's OpenGL renderer approximated the DS's "equal depth" test), a rare crash at start, and
-  OpenGL failing to start in a running game on the V30. Changing to OpenGL or Compute, or the widescreen mode, now
-  restarts the game at the same spot.
-- Play tested up until the Fire Temple (which prompted a fix for using the microphone to essentially finish the rest of the game). Some boss fights do require you to swap or rotate screens in order for you to complete them properly. a small price to pay for having this game portable. 90% can be played on a single screen. 
+Tested devices and fps measurements: [docs/TESTED.md](docs/TESTED.md).
 
 ## What you need
 
-- Your own dump of the game. Supported (checked by SHA-1):
+- Your own dump. Supported (checked by SHA-1):
 
   | Dump | SHA-1 |
   |---|---|
-  | Phantom Hourglass (USA) | `4c8f52dd719918bbcd46e73a8bae8628139c1b85` |
-  | Phantom Hourglass (USA), D-pad patch | `7e0d26d143992f1eee182b24f1abb9e7f038eacf` |
-  | Phantom Hourglass (Europe) (`En,Fr,De,Es,It`) | `02be55db55cf254bd064d2b3eb368b92a5b4156d` |
-  | Phantom Hourglass (Europe), D-pad patch | `8e3bbda6056c47f06fecf1a06d9f144a19283d88` |
+  | USA | `4c8f52dd719918bbcd46e73a8bae8628139c1b85` |
+  | USA, D-pad patch | `7e0d26d143992f1eee182b24f1abb9e7f038eacf` |
+  | Europe | `02be55db55cf254bd064d2b3eb368b92a5b4156d` |
+  | Europe, D-pad patch | `8e3bbda6056c47f06fecf1a06d9f144a19283d88` |
 
-  If both USA and Europe dumps are in `roms\`, pass `-Region eur` (or `-Region usa` / `-Rom <path>`) to `2-BUILD.ps1`,
-  `3-MAKE-GAME-FOLDER.ps1`, `RUN-ALL.ps1`, or `6-INSTALL-PHONE.ps1`.
+  With a clean dump the D-pad doesn't move Link (the patch adds that); turn on **Analog stick** in the menu instead.
+- Windows 10/11 64-bit or Linux, about 10 GB of disk, and an OpenGL 3.3 GPU for the GPU renderer.
+- For Android: an Android 8+ arm64 phone (OpenGL ES 3.2 for the GPU renderer) and a USB cable.
 
-  **Clean or D-pad patch?** In the original game the D-pad does not move Link (the patch is what adds that), so with the
-  clean dump the D-pad only does what the game itself uses it for. Turn on the **analog stick** instead (the phone
-  menu's "Analog stick", or the PC menu's "Gamepad's left stick: Analog"): it moves Link by holding the stylus beside
-  him, as you would on a DS, so it works the same with either dump. Everything else (Continue, save states, widescreen,
-  texture filtering, the movable controls) works with both.
+## Building
 
-- Windows 10 or 11 (64-bit) or Linux (x86-64/aarch64; Nix with flakes enabled), about 10 GB of disk for the tools and
-  the build. An OpenGL 3.3 graphics card for the GPU renderer (the software renderer needs nothing special).
-- For the phone: an Android 8+ phone (arm64; the GPU renderer needs OpenGL ES 3.2) and a USB cable.
-
-## Building it
-
-Clone the repository into a folder of its own (the *workspace*), put your ROM in the workspace's `roms\` folder, and run the scripts in
-`ph-recomp\scripts`:
+Put the repository and your ROM side by side:
 
 ```
-workspace\
-  ph-recomp\              (this repository)
-  roms\your-dump.nds      (any name: the scripts find it by its SHA-1)
+workspace/
+  ph-recomp/          (this repository)
+  roms/your-dump.nds  (any name)
 ```
+
+**Windows**
 
 ```powershell
 git clone --recurse-submodules <this repository> ph-recomp
 powershell -NoProfile -ExecutionPolicy Bypass -File ph-recomp\scripts\RUN-ALL.ps1
 ```
 
-`RUN-ALL.ps1` installs the build tools with winget (Git, Python, CMake, Ninja, LLVM, Visual Studio Build Tools; asks for
-admin once), recompiles your ROM and builds the game, makes a ready-to-play `PhantomHourglass\` folder in the workspace
-and plays it for a minute by itself as a test. Then double-click `PhantomHourglass\PLAY.cmd`.
+This installs the build tools, builds the game and makes a `PhantomHourglass\` folder; run its `PLAY.cmd`. For the phone,
+run `scripts\RUN-ANDROID.ps1` next. Every script takes `-DryRun`. Details and what each script changes on your PC:
+[scripts/README.md](scripts/README.md).
 
-For the phone, after that:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File ph-recomp\scripts\RUN-ANDROID.ps1
-```
-
-It gets Java 17 and the Android SDK if you do not have them (asking you to accept Android's SDK licence), builds the
-APK and installs it on the phone over USB debugging, with your ROM. Every script takes `-DryRun` to check everything
-without installing or building anything. The step-by-step guide is [scripts/README.md](scripts/README.md).
-
-### Building on Linux
-
-#### With Nix (recommended)
-
-The flake supplies CMake, Ninja, GCC, SDL3's Linux dependencies (X11/Wayland/PipeWire/ALSA/PulseAudio) and a pinned
-copy of the melonDS source (the same commit as the submodule), so nothing is installed system-wide. Put your ROM in
-`/roms/` (or this repository's `roms/` folder), then:
+**Linux**
 
 ```sh
 nix develop --command ./scripts/build-linux.sh
-```
-
-The script finds the dump by SHA-1, recompiles it, builds the game module (`libph_game.so`) and the program, and writes a
-ready-to-play folder to `games/PhantomHourglass/` beside the repository. Start it with:
-
-```sh
 nix develop --command games/PhantomHourglass/play.sh
 ```
 
-Saves and settings stay in that folder (`portable.txt`). `--rom PATH`, `--region usa|eur`, `--jobs N`, `--tests`,
-`--clean` and `--dry-run` are also accepted (see [scripts/README-LINUX.md](scripts/README-LINUX.md)). No ROM path is
-baked into the flake or committed: `*.nds` is gitignored.
+Without Nix, install CMake 3.28+, Ninja, GCC and SDL3's build dependencies, then run `./scripts/build-linux.sh --rom
+<path>`. Details: [scripts/README-LINUX.md](scripts/README-LINUX.md).
 
-Audio uses SDL's normal driver selection; the Nix environment includes PipeWire, ALSA and PulseAudio but not JACK. If
-you need to force a different SDL audio driver, set `SDL_AUDIODRIVER` (for example `SDL_AUDIODRIVER=alsa`).
+## Controls
 
-Without the script, a pure Nix build checks the program and unit tests (`nix build .#program`), and the full game can be
-built from your own dump with `PH_ROM=/roms/your-dump.nds nix build .#game --impure`. Launch it with
-`result/bin/play-phantom-hourglass` (see [scripts/README-LINUX.md](scripts/README-LINUX.md)).
+**PC:** mouse is the stylus. Arrows = D-pad, X/Z/S/A = A/B/X/Y, Q/W = L/R, Enter/Right Shift = Start/Select.
+M = mic (shout), N = blow, C = close the lid. F1 or Esc opens the menu. F5/F8 save/load a state, F9 continues.
+Tab/F2 switch screens, F11 fullscreen, \` (hold) fast-forward. Gamepads work too.
 
-#### Without Nix
+**Android:** touch is the stylus. The small buttons are the menu (≡), TOP (top screen), ⟳ (portrait), MIC, BLOW and LID.
+The menu has the renderer, save states and "Move and resize controls".
 
-On a distro with CMake 3.28+, Ninja, GCC, Git and the X11/Wayland/audio development packages installed:
+## Testing and reporting issues
 
-```sh
-git submodule update --init --depth 1
-./scripts/build-linux.sh --rom /roms/your-dump.nds
-```
+Known issues and the devices it's been tested on are in [docs/TESTED.md](docs/TESTED.md).
 
-CMake fetches the pinned SDL3 3.4.18 release the first time. The script writes the same `games/PhantomHourglass/`
-folder; run its `play.sh` directly. See [scripts/README-LINUX.md](scripts/README-LINUX.md) for all options.
+Found a bug? [Open an issue](../../issues) and include:
 
-## What the scripts do to your PC
+- **Where:** PC (Windows or Linux) or phone, with the phone model
+- **Settings:** renderer (Software, OpenGL or Compute), resolution, widescreen on or off
+- **Dump:** USA or Europe, clean or D-pad patch
+- **What happened:** the steps to get there, plus a screenshot or a save state if you can
+- **Logs:** build problems: the log in the workspace's `logs/` folder. Game problems on Android: `adb logcat` output.
 
-The scripts are plain text in `scripts\`: read any of them before running it. Add `-DryRun` to any script to see what
-it would do without installing or building anything. Each one writes a log to `logs\` in the workspace (the folder
-that holds this repository).
+Please don't attach your ROM or any game files.
 
-| Script | What it does | What it changes on your PC |
-|---|---|---|
-| `1-INSTALL-TOOLS.ps1` | Checks for the build tools; installs the missing ones with winget (Windows' package manager) | Installs Git, Python 3, CMake, Ninja, LLVM and Visual Studio 2022 Build Tools (C++ and the Windows SDK): ordinary programs, removable in Settings > Apps. Build Tools and the SDK ask for admin once. |
-| `ANDROID-TOOLS.ps1` | Uses the Java 17 and Android SDK you already have, or gets them | Java 17 (Microsoft OpenJDK, winget); Google's Android command-line tools and SDK parts (platform 35, NDK) into the tools folder. Shows Android's licence for you to accept. |
-| `2-BUILD.ps1` | Recompiles your ROM's code to C and compiles the game and the program | Reads your ROM, never changes it. Downloads melonDS and SDL3 from GitHub the first time. Writes only inside `ph-recomp\build`. |
-| `3-MAKE-GAME-FOLDER.ps1` | Makes `games\PhantomHourglass\` in the workspace: the game, ready to play | Copies the program and your ROM there; never overwrites a save. |
-| `4-TEST.ps1` | Plays the game by itself for about a minute and takes screenshots | Works on copies of your save, in the logs folder. |
-| `5-BUILD-ANDROID.ps1` | Builds the phone app (APK) into `apks\` | Gradle downloads Android libraries from Google and Maven Central the first time. |
-| `6-INSTALL-PHONE.ps1` | Installs the app on your phone over USB | Copies your ROM into the app, and a save only if the phone has none; never replaces a save on the phone. |
-| `RUN-ALL.ps1`, `RUN-ANDROID.ps1` | Run the steps above in order, stopping at the first that fails | Nothing more than the steps they run. |
-| `ci-build.ps1` | For a build PC that makes the APK by itself on every push ([BUILD-PC.md](scripts/BUILD-PC.md)) | Uploads the APK to a private GitHub repository you name. No other script runs it. |
-
-Nothing is uploaded or sent anywhere (except by `ci-build.ps1`, which only runs when you start it on purpose). Nothing is left running in the background or set to start with Windows, and
-no system settings are changed beyond what the installers above do themselves. Everything the build makes stays in the
-workspace and the tools folder.
-
-## Playing on a PC
-
-| Input | Does |
-|---|---|
-| Mouse (left button) | the stylus, on the touch screen |
-| Arrows, or a gamepad's D-pad or left stick | D-pad (the menu can make the left stick an analog stick for Link) |
-| X, Z, S, A | A, B, X, Y (a gamepad by position: A is the right face button) |
-| Q, W / Enter, Right Shift | L, R / Start, Select |
-| **M** (hold), or the right stick's click | generated microphone noise for shouting |
-| **N** (hold) | play the bundled blow sample |
-| **C** (hold) | close the DS's lid |
-| **F1** or Esc | the menu: screen, renderer and resolution, picture, FPS counter, fullscreen, save states, quit |
-| **F5** / **F8** | save a state to the chosen slot / load it |
-| **F9** | continue from where you quit |
-| Tab / F2 | the other screen / both screens |
-| F3 / F4 / F11 / F12 | sharp or smooth / FPS counter / fullscreen / screenshot |
-| ` (hold) | fast-forward |
-
-## Playing on a phone
-
-Touch the game: it is the stylus. The small buttons are the menu (≡), TOP (the top screen), ⟳ (portrait, both
-screens), MIC (generated noise), BLOW (the recorded sample), and LID. Hold MIC for shouting interactions or BLOW for
-sample-based blow interactions. The menu switches each control group on or off, sets their size and opacity, turns
-the D-pad into an analog stick, and has "Move and resize controls" (drag each one anywhere; Back or Done keeps it),
-the renderer, resolution, picture size, FPS counter (drag it anywhere) and the 12 save state slots. Quitting keeps
-where you were: the start screen's Continue picks up from there.
+**For contributors:** the unit tests need no ROM. After building, run `ctest --preset release` (Windows) or
+`ctest --preset linux-release` (Linux). On Windows, `scripts\4-TEST.ps1` also plays the game for a minute as a smoke
+test. Before a PR that touches settings or menus, check both the PC menu and the Android menu and settings.
 
 ## How it works
 
-`ntr-recomp` reads the ROM, finds every function (boundaries from the zeldaret decompilation's analysis) and writes
-them as C; that C is compiled into a game module (`ph_game.dll`, `libph_game.so` on Android) that `ntr-runtime` loads.
-The runtime runs the recompiled code natively and drives melonDS for everything else: timers, DMA, interrupts, the
-ARM7, the cartridge, the 2D and 3D engines. The game's threads run on host fibers; code the game builds at run time
-runs on melonDS's interpreter. Porting notes: [PH-PORT.md](PH-PORT.md).
-
-| Folder | What |
-|---|---|
-| `frontend/` | the program (PC and Android), the menu, save states, Phantom Hourglass's hooks, `config/azee` |
-| `android/` | the Android app: launcher, on-screen pad, menu |
-| `recompiler/` | `ntr-recomp`: ARM/Thumb decoder, function discovery, C emitter |
-| `runtime/` | `ntr-runtime`: the DS around the recompiled code (melonDS), threads, save states |
-| `common/` | ROM reading, SHA-1, the supported dumps |
-| `third_party/` | melonDS (submodule) and its build glue, the OpenGL ES shader conversion; SDL3 is fetched at build time |
-| `scripts/` | the build scripts |
-| `tools/` | the copyright guard, the OpenGL ES shader check, the icon, the function list importer |
+`ntr-recomp` turns the ROM's functions into C, which compiles into a game module that `ntr-runtime` runs natively,
+with melonDS providing the rest of the DS hardware. Porting notes: [PH-PORT.md](PH-PORT.md).
 
 ## Credits and licence
 
-The recompiler and runtime come from [FFCCEOT-Recomp](https://github.com/JonathanDC64/FFCCEOT-Recomp) by JonathanDC64,
-used as the engine of this fork; the frontend and the Android app are this project's own. The DS hardware model is
-[melonDS](https://github.com/melonDS-emu/melonDS). Function boundaries come from the
-[zeldaret/ph](https://github.com/zeldaret/ph) decompilation project. Details in [NOTICE.md](NOTICE.md).
+Recompiler and runtime from [FFCCEOT-Recomp](https://github.com/JonathanDC64/FFCCEOT-Recomp) by JonathanDC64; DS
+hardware from [melonDS](https://github.com/melonDS-emu/melonDS); function boundaries from the
+[zeldaret/ph](https://github.com/zeldaret/ph) decompilation. Details in [NOTICE.md](NOTICE.md).
 
 GPL-3.0 ([LICENSE](LICENSE)). *The Legend of Zelda: Phantom Hourglass* is © Nintendo; this project is not affiliated
 with or endorsed by Nintendo.
