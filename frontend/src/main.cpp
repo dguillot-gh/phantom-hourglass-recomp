@@ -51,6 +51,7 @@
 #include "ntr/runtime.hpp"
 #include "pad_input.hpp"
 #include "ph_stick.hpp"
+#include "perf_hint.hpp"
 #include "ph_hooks.hpp"
 #include "ph_text.hpp"
 #include "png.hpp"
@@ -826,15 +827,25 @@ private:
     void pace() {
         using clock = std::chrono::steady_clock;
         const auto now = clock::now();
+        // This frame's work (emulating and drawing) ran from the end of the last wait until now: tell Android, so it
+        // keeps the cores fast enough for the deadline (perf_hint.hpp). Not during fast-forward or a pause.
+        perf_hint_.start(int64_t(kFrameSeconds * 1e9));
+        if (work_start_.time_since_epoch().count() != 0 && !s_.paused.load() && !s_.fast_forward.load())
+            perf_hint_.report(std::chrono::duration_cast<std::chrono::nanoseconds>(now - work_start_).count());
         if (unpaced_ || s_.fast_forward.load()) {
             next_ = now;
+            work_start_ = clock::now();
             return;
         }
         const auto period = std::chrono::duration_cast<clock::duration>(std::chrono::duration<double>(kFrameSeconds));
         if (next_.time_since_epoch().count() == 0 || now - next_ > std::chrono::milliseconds(100)) next_ = now;
         next_ += period;
         if (next_ > now) SDL_DelayPrecise(uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(next_ - now).count()));
+        work_start_ = clock::now();
     }
+
+    ph::PerfHint perf_hint_;
+    std::chrono::steady_clock::time_point work_start_{};  // when this frame's work began (the end of the last wait)
 
     Shared& s_;
     SDL_Window* window_;  // (the window the game thread draws to)
