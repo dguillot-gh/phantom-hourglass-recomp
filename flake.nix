@@ -135,7 +135,7 @@
 
       devShells = forAllSystems (pkgs: {
         default = pkgs.mkShell {
-          packages = buildTools pkgs ++ sdlDeps pkgs;
+          packages = buildTools pkgs ++ sdlDeps pkgs ++ [ pkgs.xvfb-run pkgs.mesa ];
           shellHook = ''
             export CC=gcc CXX=g++
             # Use the pinned sources instead of `git submodule update` / a network fetch at configure time.
