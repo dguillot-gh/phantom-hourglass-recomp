@@ -32,7 +32,7 @@
       sdlDeps = pkgs: pkgs.sdl3.buildInputs ++ [ pkgs.wayland-scanner ];
 
       # SDL also dlopen()s drivers at runtime; keep these where the executable can find them.
-      runtimeLibs = pkgs: sdlDeps pkgs ++ [ pkgs.mesa pkgs.libjack2 ];
+      runtimeLibs = pkgs: sdlDeps pkgs ++ [ pkgs.mesa pkgs.libglvnd pkgs.libjack2 ];
 
       buildTools = pkgs: with pkgs; [
         cmake
