@@ -6,7 +6,10 @@
   outputs = { self, nixpkgs }:
     let
       systems = [ "x86_64-linux" "aarch64-linux" ];
-      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f (import nixpkgs { inherit system; }));
+      forAllSystems = f: nixpkgs.lib.listToAttrs (map (system: {
+        name = system;
+        value = f (import nixpkgs { inherit system; });
+      }) systems);
 
       # The PC build fetches SDL3 release-3.4.18 at configure time. Pin it here too so that
       # `nix build` is reproducible and works in the Nix sandbox (no network during the build).
@@ -25,7 +28,7 @@
         hash = "sha256-hJFzH7qPk2NIXl9OQQyqSId6uofJ//FoslmbyX5ZjUk=";
       };
 
-      # The headers/libs SDL3's CMake configuration needs on Linux (X11, Wayland, audio, ...).
+      # Headers/libs SDL3's CMake configuration needs on Linux (X11, Wayland, audio, ...).
       sdlDeps = pkgs: pkgs.sdl3.buildInputs ++ [ pkgs.wayland-scanner ];
 
       buildTools = pkgs: with pkgs; [
@@ -37,9 +40,12 @@
         git
         python3
       ];
-    in
-    forAllSystems (pkgs: rec {
-      packages = rec {
+
+      cmakeFlagsBase = pkgs:
+        "-DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ " +
+        "-DFETCHCONTENT_SOURCE_DIR_SDL3=${sdl3Src pkgs} -DMELONDS_DIR=${melondsSrc pkgs}";
+    in {
+      packages = forAllSystems (pkgs: rec {
         # Program, runtime and unit tests without a ROM. Pure build: `nix build .#program`.
         program = pkgs.stdenv.mkDerivation {
           pname = "phantom-hourglass-program";
@@ -50,12 +56,7 @@
 
           configurePhase = ''
             runHook preConfigure
-            cmake -S . -B build -G Ninja \
-              -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-              -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
-              -DFFCC_BUILD_TESTS=ON \
-              -DFETCHCONTENT_SOURCE_DIR_SDL3=${sdl3Src pkgs} \
-              -DMELONDS_DIR=${melondsSrc pkgs}
+            cmake -S . -B build -G Ninja ${cmakeFlagsBase pkgs} -DFFCC_BUILD_TESTS=ON
             runHook postConfigure
           '';
           buildPhase = ''
@@ -71,12 +72,12 @@
           '';
           installPhase = ''
             runHook preInstall
-            mkdir -p $out/bin $out/share/phantom-hourglass
+            mkdir -p $out/bin
             cp build/frontend/PhantomHourglass $out/bin/
             runHook postInstall
           '';
           meta = with pkgs.lib; {
-            description = "Phantom Hourglass Recomp host program (build it with a ROM to play)";
+            description = "Phantom Hourglass Recomp host program (build with a ROM to play)";
             platforms = [ "x86_64-linux" "aarch64-linux" ];
           };
         };
@@ -84,28 +85,23 @@
         # Full game: the ROM is recompiled from the user's own dump. Nix cannot copy an
         # untracked file into the store in a pure evaluation, so this derivation is impure:
         #   PH_ROM=/roms/your-dump.nds nix build .#game --impure
-        game = pkgs.stdenv.mkDerivation {
-          pname = "phantom-hourglass";
-          version = "0.1.0";
-          src = self;
-
+        game = let
           romEnv = builtins.getEnv "PH_ROM";
           rom = if romEnv == ""
             then throw "Set PH_ROM to your Phantom Hourglass dump: PH_ROM=/roms/your-dump.nds nix build .#game --impure"
             else builtins.path { path = romEnv; name = "phantom-hourglass.nds"; };
+          romName = builtins.baseNameOf rom;
+        in pkgs.stdenv.mkDerivation {
+          pname = "phantom-hourglass";
+          version = "0.1.0";
+          src = self;
 
           nativeBuildInputs = buildTools pkgs ++ sdlDeps pkgs;
           buildInputs = sdlDeps pkgs;
 
           configurePhase = ''
             runHook preConfigure
-            cmake -S . -B build -G Ninja \
-              -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-              -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
-              -DFFCC_BUILD_TESTS=OFF \
-              -DPH_ROM=${rom} \
-              -DFETCHCONTENT_SOURCE_DIR_SDL3=${sdl3Src pkgs} \
-              -DMELONDS_DIR=${melondsSrc pkgs}
+            cmake -S . -B build -G Ninja ${cmakeFlagsBase pkgs} -DFFCC_BUILD_TESTS=OFF -DPH_ROM=${rom}
             runHook postConfigure
           '';
           buildPhase = ''
@@ -118,11 +114,11 @@
             mkdir -p $out/bin $out/share/phantom-hourglass/rom
             cp build/frontend/PhantomHourglass $out/bin/
             cp build/frontend/libph_game.so $out/share/phantom-hourglass/
-            cp ${rom} $out/share/phantom-hourglass/rom/$(basename ${rom})
+            cp ${rom} $out/share/phantom-hourglass/rom/${romName}
             cat > $out/bin/play-phantom-hourglass <<EOF
             #!/bin/sh
-            exec $out/bin/PhantomHourglass --data-dir "\''${XDG_DATA_HOME:-\$HOME/.local/share}/phantom-hourglass" \
-              "$out/share/phantom-hourglass/rom/$(basename ${rom})" "\$@"
+            exec $out/bin/PhantomHourglass --data-dir "\$HOME/.local/share/phantom-hourglass" \
+              "$out/share/phantom-hourglass/rom/${romName}" "\$@"
             EOF
             chmod +x $out/bin/play-phantom-hourglass
             runHook postInstall
@@ -134,19 +130,21 @@
         };
 
         default = game;
-      };
+      });
 
-      devShells.default = pkgs.mkShell {
-        packages = buildTools pkgs ++ sdlDeps pkgs;
-        shellHook = ''
-          # Use the pinned sources instead of `git submodule update` / a network fetch at configure time.
-          export FETCHCONTENT_SOURCE_DIR_SDL3="${sdl3Src pkgs}"
-          export MELONDS_DIR="${melondsSrc pkgs}"
-          # SDL3 and the other shared libraries need to be found when running the built program.
-          export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath (sdlDeps pkgs)}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-          echo "Phantom Hourglass Recomp: nix develop ready."
-          echo "Build with: ./scripts/build-linux.sh --rom /roms/your-dump.nds"
-        '';
-      };
-    });
+      devShells = forAllSystems (pkgs: {
+        default = pkgs.mkShell {
+          packages = buildTools pkgs ++ sdlDeps pkgs;
+          shellHook = ''
+            # Use the pinned sources instead of `git submodule update` / a network fetch at configure time.
+            export FETCHCONTENT_SOURCE_DIR_SDL3="${sdl3Src pkgs}"
+            export MELONDS_DIR="${melondsSrc pkgs}"
+            # SDL3 and the other shared libraries need to be found when running the built program.
+            export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath (sdlDeps pkgs)}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+            echo "Phantom Hourglass Recomp: nix develop ready."
+            echo "Build with: ./scripts/build-linux.sh --rom /roms/your-dump.nds"
+          '';
+        };
+      });
+    };
 }
