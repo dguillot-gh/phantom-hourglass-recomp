@@ -174,7 +174,7 @@ without installing or building anything. The step-by-step guide is [scripts/READ
 
 ### Building on Linux with Nix
 
-The flake supplies CMake, Ninja, Clang, SDL3's Linux dependencies and a pinned copy of the melonDS source (the same
+The flake supplies CMake, Ninja, GCC, SDL3's Linux dependencies and a pinned copy of the melonDS source (the same
 commit as the submodule), so nothing is installed system-wide. Put your ROM in `/roms/` (or this repository's `roms/`
 folder), then:
 
