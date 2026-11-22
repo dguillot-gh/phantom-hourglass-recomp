@@ -126,9 +126,7 @@ configure=(--preset linux-release "-DPH_ROM=$ROM_PATH")
 [[ -n "${MELONDS_DIR:-}" ]] && configure+=("-DMELONDS_DIR=$MELONDS_DIR")
 run cmake "${configure[@]}"
 
-build=(cmake --build --preset linux-release)
-[[ -n "$jobs" ]] && build+=(--parallel "$jobs")
-run "${build[@]}"
+run cmake --build --preset linux-release ${jobs:+--parallel "$jobs"}
 
 if (( tests )); then run ctest --preset linux-release --output-on-failure; fi
 
