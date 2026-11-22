@@ -84,7 +84,7 @@ and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melo
 
   Other phones should work (Android 8 or newer, 64-bit ARM), but GPU drivers differ: if the picture looks wrong, the
   software renderer (1x, in the menu) is the safe fallback.
-- **PC:** Windows 11.
+- **PC:** Windows 11 and Linux (built with the Nix flake; Clang 21 on x86-64 Linux).
 - **Status:** plays on PC, the Pixel 8 and the LG V30.
 - **Measured** (2026-11-03, this `main` build on both phones): each renderer set the way the menu does, the game
   continued from the same spot in gameplay, 20 s to settle, then 30 s of the frames the phone actually showed
@@ -138,8 +138,8 @@ and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melo
   him, as you would on a DS, so it works the same with either dump. Everything else (Continue, save states, widescreen,
   texture filtering, the movable controls) works with both.
 
-- Windows 10 or 11 (64-bit), about 10 GB of disk for the tools and the build. An OpenGL 3.3 graphics card for the GPU
-  renderer (the software renderer needs nothing special).
+- Windows 10 or 11 (64-bit) or Linux (x86-64/aarch64; Nix with flakes enabled), about 10 GB of disk for the tools and
+  the build. An OpenGL 3.3 graphics card for the GPU renderer (the software renderer needs nothing special).
 - For the phone: an Android 8+ phone (arm64; the GPU renderer needs OpenGL ES 3.2) and a USB cable.
 
 ## Building it
@@ -171,6 +171,25 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ph-recomp\scripts\RUN-ANDROI
 It gets Java 17 and the Android SDK if you do not have them (asking you to accept Android's SDK licence), builds the
 APK and installs it on the phone over USB debugging, with your ROM. Every script takes `-DryRun` to check everything
 without installing or building anything. The step-by-step guide is [scripts/README.md](scripts/README.md).
+
+### Building on Linux with Nix
+
+The flake supplies CMake, Ninja, Clang, SDL3's Linux dependencies and a pinned copy of the melonDS source (the same
+commit as the submodule), so nothing is installed system-wide. Put your ROM in `/roms/` (or this repository's `roms/`
+folder), then:
+
+```sh
+nix develop --command ./scripts/build-linux.sh
+```
+
+The script finds the dump by SHA-1, recompiles it, builds the game module (`libph_game.so`) and the program, and writes a
+ready-to-play folder to `games/PhantomHourglass/` beside the repository. Start it with
+`games/PhantomHourglass/play.sh`. Saves and settings stay in that folder (`portable.txt`). `--rom PATH`, `--region
+usa|eur`, `--jobs N`, `--tests`, `--clean` and `--dry-run` are also accepted (see [scripts/README-LINUX.md](scripts/README-LINUX.md)).
+No ROM path is baked into the flake or committed: `*.nds` is gitignored.
+
+Without the script, a pure Nix build checks the program and unit tests (`nix build .#program`), and the full game can be
+built from your own dump with `PH_ROM=/roms/your-dump.nds nix build .#game --impure` (the result is in `result/bin/`).
 
 ## What the scripts do to your PC
 
