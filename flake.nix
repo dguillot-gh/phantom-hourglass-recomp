@@ -122,6 +122,7 @@
             cat > $out/bin/play-phantom-hourglass <<EOF
             #!/bin/sh
             exec $out/bin/PhantomHourglass --data-dir "\$HOME/.local/share/phantom-hourglass" \
+              --module "$out/share/phantom-hourglass/libph_game.so" \
               "$out/share/phantom-hourglass/rom/${romName}" "\$@"
             EOF
             chmod +x $out/bin/play-phantom-hourglass
