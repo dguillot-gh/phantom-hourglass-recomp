@@ -100,7 +100,7 @@
           version = "0.1.0";
           src = self;
 
-          nativeBuildInputs = buildTools pkgs ++ sdlDeps pkgs;
+          nativeBuildInputs = buildTools pkgs ++ sdlDeps pkgs ++ [ pkgs.makeWrapper ];
           buildInputs = runtimeLibs pkgs;
 
           configurePhase = ''
@@ -117,6 +117,10 @@
             runHook preInstall
             mkdir -p $out/bin $out/share/phantom-hourglass/rom
             cp build/frontend/PhantomHourglass $out/bin/
+            # SDL loads its X11/Wayland drivers with dlopen(), so the pinned libraries must be
+            # on the library path even when the game is started outside `nix develop`.
+            wrapProgram $out/bin/PhantomHourglass \
+              --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath (runtimeLibs pkgs)}"
             cp build/frontend/libph_game.so $out/share/phantom-hourglass/
             cp ${rom} $out/share/phantom-hourglass/rom/${romName}
             cat > $out/bin/play-phantom-hourglass <<EOF
