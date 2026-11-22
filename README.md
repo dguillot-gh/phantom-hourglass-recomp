@@ -172,24 +172,47 @@ It gets Java 17 and the Android SDK if you do not have them (asking you to accep
 APK and installs it on the phone over USB debugging, with your ROM. Every script takes `-DryRun` to check everything
 without installing or building anything. The step-by-step guide is [scripts/README.md](scripts/README.md).
 
-### Building on Linux with Nix
+### Building on Linux
 
-The flake supplies CMake, Ninja, GCC, SDL3's Linux dependencies and a pinned copy of the melonDS source (the same
-commit as the submodule), so nothing is installed system-wide. Put your ROM in `/roms/` (or this repository's `roms/`
-folder), then:
+#### With Nix (recommended)
+
+The flake supplies CMake, Ninja, GCC, SDL3's Linux dependencies (X11/Wayland/PipeWire/ALSA/PulseAudio) and a pinned
+copy of the melonDS source (the same commit as the submodule), so nothing is installed system-wide. Put your ROM in
+`/roms/` (or this repository's `roms/` folder), then:
 
 ```sh
 nix develop --command ./scripts/build-linux.sh
 ```
 
 The script finds the dump by SHA-1, recompiles it, builds the game module (`libph_game.so`) and the program, and writes a
-ready-to-play folder to `games/PhantomHourglass/` beside the repository. Start it with
-`games/PhantomHourglass/play.sh`. Saves and settings stay in that folder (`portable.txt`). `--rom PATH`, `--region
-usa|eur`, `--jobs N`, `--tests`, `--clean` and `--dry-run` are also accepted (see [scripts/README-LINUX.md](scripts/README-LINUX.md)).
-No ROM path is baked into the flake or committed: `*.nds` is gitignored.
+ready-to-play folder to `games/PhantomHourglass/` beside the repository. Start it with:
+
+```sh
+nix develop --command games/PhantomHourglass/play.sh
+```
+
+Saves and settings stay in that folder (`portable.txt`). `--rom PATH`, `--region usa|eur`, `--jobs N`, `--tests`,
+`--clean` and `--dry-run` are also accepted (see [scripts/README-LINUX.md](scripts/README-LINUX.md)). No ROM path is
+baked into the flake or committed: `*.nds` is gitignored.
+
+Audio uses SDL's normal driver selection; the Nix environment includes PipeWire, ALSA and PulseAudio but not JACK. If
+you need to force a different SDL audio driver, set `SDL_AUDIODRIVER` (for example `SDL_AUDIODRIVER=alsa`).
 
 Without the script, a pure Nix build checks the program and unit tests (`nix build .#program`), and the full game can be
-built from your own dump with `PH_ROM=/roms/your-dump.nds nix build .#game --impure` (the result is in `result/bin/`).
+built from your own dump with `PH_ROM=/roms/your-dump.nds nix build .#game --impure`. Launch it with
+`result/bin/play-phantom-hourglass` (see [scripts/README-LINUX.md](scripts/README-LINUX.md)).
+
+#### Without Nix
+
+On a distro with CMake 3.28+, Ninja, GCC, Git and the X11/Wayland/audio development packages installed:
+
+```sh
+git submodule update --init --depth 1
+./scripts/build-linux.sh --rom /roms/your-dump.nds
+```
+
+CMake fetches the pinned SDL3 3.4.18 release the first time. The script writes the same `games/PhantomHourglass/`
+folder; run its `play.sh` directly. See [scripts/README-LINUX.md](scripts/README-LINUX.md) for all options.
 
 ## What the scripts do to your PC
 

@@ -31,7 +31,13 @@ games/PhantomHourglass/
   data/saves/           your save and save states
 ```
 
-Run `./play.sh` from that folder, or pass the ROM path directly:
+On Nix, start it through the dev shell so the pinned runtime libraries are on the library path:
+
+```sh
+nix develop --command games/PhantomHourglass/play.sh
+```
+
+Outside Nix, run `./play.sh` from that folder, or pass the ROM path directly:
 `./PhantomHourglass rom/azee.nds`. The controls are the same as on Windows (see the main README).
 
 ## Options and environment
@@ -56,6 +62,10 @@ The dev shell exports `FETCHCONTENT_SOURCE_DIR_SDL3` and `MELONDS_DIR` so CMake 
 submodule checkout instead, unset `MELONDS_DIR` (the script will run `git submodule update --init` if needed). SDL3 is
 fetched from GitHub only if you are building without Nix and without that variable set.
 
+The same dev shell provides SDL3's runtime libraries, including PipeWire, ALSA and PulseAudio, but not JACK, so the game
+selects a normal audio driver instead of failing when no JACK server is running. Set `SDL_AUDIODRIVER` to override SDL's
+choice, for example `SDL_AUDIODRIVER=alsa nix develop --command games/PhantomHourglass/play.sh`.
+
 ## Nix build
 
 - `nix build .#program` — pure build of the host program and unit tests (no ROM; not playable on its own).
@@ -65,11 +75,14 @@ fetched from GitHub only if you are building without Nix and without that variab
 
 ## Building without Nix
 
-On a distro with CMake 3.28+, Ninja, GCC, Git and SDL3's Linux headers (X11/Wayland/audio) installed:
+On a distro with CMake 3.28+, Ninja, GCC, Git and the X11/Wayland/audio development packages installed:
 
 ```sh
 git submodule update --init --depth 1
 ./scripts/build-linux.sh --rom /roms/your-dump.nds
 ```
 
-CMake fetches the pinned SDL3 3.4.18 release into `build/linux-release/_deps` the first time.
+CMake fetches the pinned SDL3 3.4.18 release into `build/linux-release/_deps` the first time (network access needed once).
+The script writes the same `games/PhantomHourglass/` folder; run its `play.sh` directly on a normal desktop session. All
+options from the table above work without Nix as well, except that `FETCHCONTENT_SOURCE_DIR_SDL3` is only set by the dev
+shell.
