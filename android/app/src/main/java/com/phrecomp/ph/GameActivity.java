@@ -88,17 +88,23 @@ public class GameActivity extends SDLActivity {
         runOnUiThread(this::applyOrientation);
     }
 
-    /** Ask for a 60 Hz display mode while the game is on screen. The DS runs at ~60 fps; on a 90 Hz panel a
-     *  60 fps game is otherwise shown at 45 (and unevenly on 120 Hz ones). Same resolution as the current mode;
-     *  Android switches back when the game leaves the screen, so nobody has to change a phone setting. */
+    /** Ask for a display mode that is a whole multiple of 60 Hz while the game is on screen. The DS runs at ~60 fps;
+     *  on a 90 Hz panel (adaptive phones go there while the screen is touched) a 60 fps game judders. The highest
+     *  multiple of 60 is preferred (120 Hz: every frame shows for exactly two refreshes, and a frame that runs late
+     *  waits only 8.3 ms, where a plain 60 Hz mode makes it wait a whole 16.7 ms); without one, the mode closest to
+     *  60 Hz. Same resolution as the current mode; Android switches back when the game leaves the screen. */
     private void prefer60Hz() {
         if (Build.VERSION.SDK_INT < 23) return;
         android.view.Display display = getWindowManager().getDefaultDisplay();
-        android.view.Display.Mode current = display.getMode(), best = null;
+        android.view.Display.Mode current = display.getMode(), best = null, closest = null;
         for (android.view.Display.Mode m : display.getSupportedModes()) {
             if (m.getPhysicalWidth() != current.getPhysicalWidth() || m.getPhysicalHeight() != current.getPhysicalHeight()) continue;
-            if (best == null || Math.abs(m.getRefreshRate() - 60f) < Math.abs(best.getRefreshRate() - 60f)) best = m;
+            float hz = m.getRefreshRate(), multiple = hz / 60f;
+            boolean of60 = multiple >= 0.99f && Math.abs(multiple - Math.round(multiple)) < 0.01f;
+            if (of60 && (best == null || hz > best.getRefreshRate())) best = m;
+            if (closest == null || Math.abs(hz - 60f) < Math.abs(closest.getRefreshRate() - 60f)) closest = m;
         }
+        if (best == null) best = closest;
         if (best == null) return;
         WindowManager.LayoutParams lp = getWindow().getAttributes();
         lp.preferredDisplayModeId = best.getModeId();
