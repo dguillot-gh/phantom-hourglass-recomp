@@ -126,6 +126,7 @@ and sound hardware) comes from the [melonDS](https://github.com/melonDS-emu/melo
   |---|---|
   | Phantom Hourglass (USA) | `4c8f52dd719918bbcd46e73a8bae8628139c1b85` |
   | Phantom Hourglass (USA), D-pad patch | `7e0d26d143992f1eee182b24f1abb9e7f038eacf` |
+  | Phantom Hourglass (USA), Button controls patch | `8915d99da2dd99bd2c05bc7a79fd2660a5e8ce5e` |
   | Phantom Hourglass (Europe) (`En,Fr,De,Es,It`) | `02be55db55cf254bd064d2b3eb368b92a5b4156d` |
   | Phantom Hourglass (Europe), D-pad patch | `8e3bbda6056c47f06fecf1a06d9f144a19283d88` |
 

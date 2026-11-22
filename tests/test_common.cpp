@@ -60,13 +60,16 @@ static ntr::Sha1Digest digest_of(const std::string& hex) {
 static void test_known_roms() {
     const ntr::KnownRom* clean = ntr::find_known_rom(digest_of("4c8f52dd719918bbcd46e73a8bae8628139c1b85"));
     const ntr::KnownRom* dpad = ntr::find_known_rom(digest_of("7e0d26d143992f1eee182b24f1abb9e7f038eacf"));
+    const ntr::KnownRom* patched = ntr::find_known_rom(digest_of("8915d99da2dd99bd2c05bc7a79fd2660a5e8ce5e"));
     const ntr::KnownRom* eur = ntr::find_known_rom(digest_of("02be55db55cf254bd064d2b3eb368b92a5b4156d"));
     const ntr::KnownRom* eur_dpad = ntr::find_known_rom(digest_of("8e3bbda6056c47f06fecf1a06d9f144a19283d88"));
-    CHECK(clean && dpad && eur && eur_dpad);
-    if (clean && dpad && eur && eur_dpad) {
+    CHECK(clean && dpad && patched && eur && eur_dpad);
+    if (clean && dpad && patched && eur && eur_dpad) {
         CHECK(std::string(clean->game_code) == "AZEE" && clean->supported);
         CHECK(std::string(dpad->game_code) == "AZEE" && dpad->supported);
         CHECK(std::string(dpad->crc32_hex) == "404e6312");
+        CHECK(std::string(patched->game_code) == "AZEE" && patched->supported);
+        CHECK(std::string(patched->crc32_hex) == "5b02447a");
         CHECK(std::string(eur->game_code) == "AZEP" && eur->supported);
         CHECK(std::string(eur_dpad->game_code) == "AZEP" && eur_dpad->supported);
         CHECK(std::string(eur_dpad->crc32_hex) == "fbb3c296");
