@@ -3,7 +3,7 @@
 #
 # Inside the flake:  nix develop -c ./scripts/build-linux.sh --rom /roms/your-dump.nds
 # Outside Nix:       ./scripts/build-linux.sh --rom /roms/your-dump.nds
-#                    (needs CMake >= 3.28, Ninja, clang, git; SDL3 is fetched by CMake)
+#                    (needs CMake >= 3.28, Ninja, GCC, git; SDL3 is fetched by CMake)
 #
 # Options: --rom PATH --region usa|eur --jobs N --game-dir DIR --tests --clean --dry-run --help
 # Environment: PH_ROM, PH_REGION, PH_ROMS_DIR, PH_GAME_DIR, and the usual Nix CMake variables.

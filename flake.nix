@@ -31,6 +31,9 @@
       # Headers/libs SDL3's CMake configuration needs on Linux (X11, Wayland, audio, ...).
       sdlDeps = pkgs: pkgs.sdl3.buildInputs ++ [ pkgs.wayland-scanner ];
 
+      # SDL also dlopen()s drivers at runtime; keep these where the executable can find them.
+      runtimeLibs = pkgs: sdlDeps pkgs ++ [ pkgs.mesa pkgs.libjack2 ];
+
       buildTools = pkgs: with pkgs; [
         cmake
         ninja
@@ -53,7 +56,7 @@
           version = "0.1.0";
           src = self;
           nativeBuildInputs = buildTools pkgs ++ sdlDeps pkgs;
-          buildInputs = sdlDeps pkgs;
+          buildInputs = runtimeLibs pkgs;
 
           configurePhase = ''
             runHook preConfigure
@@ -98,7 +101,7 @@
           src = self;
 
           nativeBuildInputs = buildTools pkgs ++ sdlDeps pkgs;
-          buildInputs = sdlDeps pkgs;
+          buildInputs = runtimeLibs pkgs;
 
           configurePhase = ''
             runHook preConfigure
@@ -142,7 +145,7 @@
             export FETCHCONTENT_SOURCE_DIR_SDL3="${sdl3Src pkgs}"
             export MELONDS_DIR="${melondsSrc pkgs}"
             # SDL3 and the other shared libraries need to be found when running the built program.
-            export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath (sdlDeps pkgs)}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+            export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath (runtimeLibs pkgs)}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
             echo "Phantom Hourglass Recomp: nix develop ready."
             echo "Build with: ./scripts/build-linux.sh --rom /roms/your-dump.nds"
           '';
