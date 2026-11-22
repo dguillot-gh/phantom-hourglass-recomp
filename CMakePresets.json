@@ -40,7 +40,7 @@
     },
     {
       "name": "linux-release",
-      "displayName": "Release (Linux clang)",
+      "displayName": "Release (Linux)",
       "inherits": "base",
       "condition": {
         "type": "equals",
@@ -48,9 +48,7 @@
         "rhs": "Linux"
       },
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "CMAKE_C_COMPILER": "clang",
-        "CMAKE_CXX_COMPILER": "clang++"
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
     },
     {

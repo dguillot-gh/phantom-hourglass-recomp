@@ -1,5 +1,7 @@
 # Building Phantom Hourglass, step by step
 
+On Linux, use the Nix flake and `build-linux.sh` instead of the PowerShell steps below: [README-LINUX.md](README-LINUX.md).
+
 The scripts build everything into the *workspace*: the folder that holds this repository (`ph-recomp\`). Put your ROM in its
 `roms\` folder (any file name; it is found by its SHA-1; loose in the workspace works too). They only ever read the ROM.
 
