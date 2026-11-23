@@ -1079,7 +1079,7 @@ int main(int argc, char** argv) {
     if (rom.empty()) return error_box("Cannot read the game ROM: " + rom_path.string()), 1;
     const ntr::KnownRom* known = ntr::find_known_rom(ntr::sha1(rom));
     if (!known || !known->supported || !ph::select_release(known->game_code))
-        return error_box(rom_path.string() + " is not a supported Phantom Hourglass dump (USA or Europe, clean or D-pad patch)."), 1;
+        return error_box(rom_path.string() + " is not a supported Phantom Hourglass dump (USA or Europe, clean or patched)."), 1;
     if (save_path.empty()) {
         std::string lower_code = known->game_code;
         for (char& ch : lower_code)

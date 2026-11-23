@@ -38,10 +38,11 @@ import java.util.Locale;
  */
 public final class LauncherActivity extends Activity {
     private static final int PICK_ROM = 1, PICK_SAVE = 2, EXPORT_SAVE = 3;
-    // The dumps the game can be recompiled for (SHA-1): USA and Europe, clean or D-pad patch.
+    // The dumps the game can be recompiled for (SHA-1): USA and Europe, clean or patched.
     private static final String[] KNOWN = {
             "4c8f52dd719918bbcd46e73a8bae8628139c1b85",
             "7e0d26d143992f1eee182b24f1abb9e7f038eacf",
+            "8915d99da2dd99bd2c05bc7a79fd2660a5e8ce5e",
             "02be55db55cf254bd064d2b3eb368b92a5b4156d",
             "8e3bbda6056c47f06fecf1a06d9f144a19283d88",
     };
@@ -81,7 +82,7 @@ public final class LauncherActivity extends Activity {
     // ---- per game ----
     private static final String TITLE = "The Legend of Zelda\nPhantom Hourglass";
     private static final String SUBTITLE = "Nintendo DS · native Android port";
-    private static final String ROM_HELP = "Choose your own dump of Phantom Hourglass (USA or Europe, clean or D-pad patch). "
+    private static final String ROM_HELP = "Choose your own dump of Phantom Hourglass (USA or Europe, clean or patched). "
             + "It must match the region this APK was built for. It is copied into the app's storage; nothing is downloaded. "
             + "A save from melonDS (.sav) can be imported afterwards under Save file.";
     private static final String SAVE_NAME = "PhantomHourglass.sav";
@@ -239,7 +240,7 @@ public final class LauncherActivity extends Activity {
         }
         //noinspection ResultOfMethodCallIgnored
         tmp.delete();
-        return "That file is not a supported Phantom Hourglass dump (USA or Europe, clean or D-pad patch).\nSHA-1: " + sha1;
+        return "That file is not a supported Phantom Hourglass dump (USA or Europe, clean or patched).\nSHA-1: " + sha1;
     }
 
     private String importSave(Uri uri) throws IOException {

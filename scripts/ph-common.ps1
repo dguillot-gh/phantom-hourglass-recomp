@@ -67,16 +67,18 @@ function Run-Optional([string] $what, [scriptblock] $cmd) {
     return ($code -eq 0)
 }
 
-# ---- the ROM: USA or Europe (clean or D-pad patch) ------------------------------------------------------------------
+# ---- the ROM: USA or Europe (clean or patched) -----------------------------------------------------------------------
 $KnownRoms = @{
     '4c8f52dd719918bbcd46e73a8bae8628139c1b85' = 'USA (clean)'
     '7e0d26d143992f1eee182b24f1abb9e7f038eacf' = 'USA (D-pad patch)'
+    '8915d99da2dd99bd2c05bc7a79fd2660a5e8ce5e' = 'USA (Button controls patch)'
     '02be55db55cf254bd064d2b3eb368b92a5b4156d' = 'Europe (clean)'
     '8e3bbda6056c47f06fecf1a06d9f144a19283d88' = 'Europe (D-pad patch)'
 }
 $KnownRomCodes = @{
     '4c8f52dd719918bbcd46e73a8bae8628139c1b85' = 'azee'
     '7e0d26d143992f1eee182b24f1abb9e7f038eacf' = 'azee'
+    '8915d99da2dd99bd2c05bc7a79fd2660a5e8ce5e' = 'azee'
     '02be55db55cf254bd064d2b3eb368b92a5b4156d' = 'azep'
     '8e3bbda6056c47f06fecf1a06d9f144a19283d88' = 'azep'
 }
@@ -108,7 +110,7 @@ function Find-Rom([string] $RomPath = '', [string] $Region = '') {
             default { Fail "unknown -Region '$Region' (expected usa or eur)" }
         }
     }
-    $priority = @{ 'USA (clean)' = 4; 'Europe (clean)' = 3; 'USA (D-pad patch)' = 2; 'Europe (D-pad patch)' = 1 }
+    $priority = @{ 'USA (clean)' = 4; 'Europe (clean)' = 3; 'USA (D-pad patch)' = 2; 'USA (Button controls patch)' = 2; 'Europe (D-pad patch)' = 1 }
     $found = ''
     $foundScore = -1
     $others = @()

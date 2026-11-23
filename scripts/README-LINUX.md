@@ -55,7 +55,7 @@ Outside Nix, run `./play.sh` from that folder, or pass the ROM path directly:
 | `--dry-run` | Check the ROM, tools and commands without building. |
 
 ROM search order: `--rom`/`PH_ROM`, then `PH_ROMS_DIR` (colon-separated), `/roms/`, the repository's `roms/`, and the
-workspace's `roms/`. Supported SHA-1s are the four listed in the main README; unsupported dumps are rejected. The
+workspace's `roms/`. Supported SHA-1s are the ones listed in the main README; unsupported dumps are rejected. The
 `.nds` files are never committed.
 
 The dev shell exports `FETCHCONTENT_SOURCE_DIR_SDL3` and `MELONDS_DIR` so CMake uses the pinned sources. To use your own
