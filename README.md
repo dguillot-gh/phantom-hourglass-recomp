@@ -31,6 +31,8 @@ ARM9 code is statically recompiled to C and compiled ahead of time instead of em
 - Android: a minimap of the other screen in the bottom-left corner (landscape), like a game's corner map: tap it to
   swap the screens, hold it to move it, pinch it to resize it, or hide it with the MAP button. It moves above dialogue
   boxes and hides in cutscenes.
+- Temple of the Ocean King floor checkpoints: every floor Link reaches is remembered, and 1F's stairs down can take
+  him straight to any of them (see below)
 
 Tested devices and fps measurements: [docs/TESTED.md](docs/TESTED.md).
 
@@ -50,7 +52,56 @@ Tested devices and fps measurements: [docs/TESTED.md](docs/TESTED.md).
 - Windows 10/11 64-bit or Linux, about 10 GB of disk, and an OpenGL 3.3 GPU for the GPU renderer.
 - For Android: an Android 8+ arm64 phone (OpenGL ES 3.2 for the GPU renderer) and a USB cable.
 
+## Quick start (new to this?)
+
+You build the game on a Windows PC from your own copy of the game. It takes about an hour the first time, mostly
+waiting. Step by step:
+
+1. **Install Git** (to download this project): open the Start menu, type `PowerShell`, open it, and paste this line
+   (right-click pastes), then press Enter:
+   ```powershell
+   winget install --id Git.Git -e
+   ```
+   Close PowerShell and open it again afterwards.
+2. **Make a folder for everything**, for example `C:\Games\ph-workspace`, and inside it a folder named `roms`. Put
+   your Phantom Hourglass dump in `roms` (any file name).
+3. **Download the project** into that folder. In PowerShell, paste these two lines (change the path if you used another
+   folder):
+   ```powershell
+   cd C:\Games\ph-workspace
+   git clone --recurse-submodules https://github.com/dguillot-gh/phantom-hourglass-recomp.git ph-recomp
+   ```
+   Don't use GitHub's green "Download ZIP" button: the ZIP leaves out melonDS, and the build then fails.
+   The folder should now look like this:
+   ```
+   C:\Games\ph-workspace\
+     ph-recomp\           (the project)
+     roms\your-dump.nds   (your game)
+   ```
+4. **Build it** (installs the build tools the first time; Windows asks for admin once):
+   ```powershell
+   powershell -NoProfile -ExecutionPolicy Bypass -File ph-recomp\scripts\RUN-ALL.ps1
+   ```
+   When it says it's done, open `C:\Games\ph-workspace\games\PhantomHourglass\` and double-click
+   `PhantomHourglass.exe` (`PLAY.cmd` does the same). That folder is the whole game: move it anywhere you like.
+5. **For an Android phone:**
+   - Turn on USB debugging once: Settings → About phone → tap **Build number** seven times; then Settings → System →
+     Developer options → **USB debugging** on.
+   - Plug the phone into the PC with a USB cable and tap **Allow** on the phone when it asks.
+   - In the same PowerShell window:
+     ```powershell
+     powershell -NoProfile -ExecutionPolicy Bypass -File ph-recomp\scripts\RUN-ANDROID.ps1
+     ```
+     It builds the app, installs it and copies your game in. Without a cable, add `-NoPhone`: it only makes the app (in
+     `apks\`); copy that file to the phone, tap it to install, and pick your ROM on the app's start screen.
+
+**If something goes wrong:** the script stops with a `FAIL` line that says what's missing. Every step's full output is
+in the `logs\` folder; attach the newest log when you [open an issue](../../issues). Don't attach your ROM.
+
 ## Building
+
+The short version, for people who already use Git and PowerShell.
+
 
 Put the repository and your ROM side by side:
 
@@ -90,6 +141,13 @@ Tab/F2 switch screens, F11 fullscreen, \` (hold) fast-forward. Gamepads work too
 **Android:** touch is the stylus. The small buttons are the menu (≡), TOP (top screen), ⟳ (portrait), MAP (the minimap), MIC, BLOW and
 LID.
 The menu has the renderer, save states and "Move and resize controls".
+
+**Temple of the Ocean King checkpoints:** every floor Link walks down to is remembered (in `temple_floors.txt`, in
+the data folder). Once he has been past B1, the Entry Hall (before 1F) shows *1F Stairs Down: B1 (L)* at the top of
+the screen: press L to step through the floors reached (B1, then the deeper ones). Then go down to 1F as usual, where
+the sand timer starts, and 1F's stairs down lead to the floor picked instead of B1. Link arrives as if he had come
+down that floor's own stairs: the floor starts fresh, and keys from floors above are not carried down. L is used only
+while the picker is shown; R and everything else go to the game. The floors are kept for every save file alike.
 
 ## Testing and reporting issues
 

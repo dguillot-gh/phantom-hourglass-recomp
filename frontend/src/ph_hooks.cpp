@@ -2,6 +2,8 @@
 #include "ph_hooks.hpp"
 #include "ph_text.hpp"
 
+extern "C" int ph_find_exit(NtrCpu* c);  // ph_temple.cpp
+
 #include <atomic>
 #include <cstdint>
 #include <cstring>
@@ -86,6 +88,7 @@ void* find_hook(const char* name) {
         {"ph_text_clear", reinterpret_cast<void*>(&ph_text_clear)},
         {"ph_text_clear_area", reinterpret_cast<void*>(&ph_text_clear_area)},
         {"ph_text_draw_char", reinterpret_cast<void*>(&ph_text_draw_char)},
+        {"ph_find_exit", reinterpret_cast<void*>(&ph_find_exit)},
         {"ph_text_obj_draw", reinterpret_cast<void*>(&ph_text_obj_draw)},
         {"ph_text_oam_flush", reinterpret_cast<void*>(&ph_text_oam_flush)},
     };
