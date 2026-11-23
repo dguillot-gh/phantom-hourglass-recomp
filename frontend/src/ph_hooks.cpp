@@ -31,9 +31,25 @@ std::atomic<uint32_t> g_aspect{0x1555};
 }
 extern "C" void ph_perspective_aspect(NtrCpu* c) {
     const uint32_t aspect = g_aspect.load(std::memory_order_relaxed);
-    if (c->r[2] == 0x1555 && aspect != 0x1555 && ffcc_wide_block == 0) {
-        c->r[2] = aspect;
-        ffcc_wide_scene = 8;
+    if (aspect == 0x1555 || ffcc_wide_block != 0) return;
+    if (c->r[2] == 0x1555) c->r[2] = aspect;
+    if (c->r[2] == aspect) ffcc_wide_scene = 8;  // (the camera's own aspect is already the wide one: ph_camera_planes)
+}
+
+// Overlay 0 0x02087070: the camera builds the four side planes of its view (at this + 0x10C) from its field of view
+// (this + 4) and aspect ratio (this + 8, the DS's 4:3), and tests every actor's bounding sphere against them
+// (0x02088014): NPCs, grass, signs outside the 4:3 view are not drawn. Widescreen gives the camera the wide aspect, so
+// its planes (and the projection it builds from the same field) take in the whole wide picture; back to 4:3, the DS's.
+namespace {
+uint32_t g_camera_aspect_written = 0;  // the wide aspect last written to a camera
+}
+extern "C" void ph_camera_planes(NtrCpu* c) {
+    const uint32_t aspect = g_aspect.load(std::memory_order_relaxed);
+    const uint32_t field = c->r[0] + 8u;
+    const uint32_t cur = ntr_rd32(c, field);
+    if ((cur == 0x1555u || (cur == g_camera_aspect_written && cur != 0)) && cur != aspect) {
+        ntr_wr32(c, field, aspect);
+        if (aspect != 0x1555u) g_camera_aspect_written = aspect;
     }
 }
 
@@ -61,6 +77,7 @@ void* find_hook(const char* name) {
     } kHooks[] = {
         {"ph_os_irq_handler", reinterpret_cast<void*>(&ph_os_irq_handler)},
         {"ph_perspective_aspect", reinterpret_cast<void*>(&ph_perspective_aspect)},
+        {"ph_camera_planes", reinterpret_cast<void*>(&ph_camera_planes)},
         {"ntr_nitro_save_context", reinterpret_cast<void*>(&ntr_nitro_save_context)},
         {"ntr_nitro_load_context", reinterpret_cast<void*>(&ntr_nitro_load_context)},
         {"ntr_nitro_init_context", reinterpret_cast<void*>(&ntr_nitro_init_context)},

@@ -83,6 +83,7 @@ struct Frame {
         int x0, y0, x1, y1, dx;
     };
     int hud_moves = 0;
+    int hud_absent = 0;  // frames without the game's HUD on screen (GPU renderers; 0 with the software one)
     HudMove hud_move[32]{};
     // Measurements of the emulation up to this frame (testing, see docs/TESTING.md).
     double emu_ms = 0;               // host time spent emulating this frame (not the frontend's pacing or presenting)

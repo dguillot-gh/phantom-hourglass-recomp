@@ -22,6 +22,8 @@ extern int FfccHudEdges, FfccHudScale;
 // GPU2D_OpenGL.cpp: the HUD clusters it moved this frame (x0, y0, x1, y1 in DS pixels before the move, x offset).
 extern int FfccHudMoved[32][5];
 extern int FfccHudMovedCount;
+// Frames since the game's HUD (a sprite at a side edge, top or bottom band) was last on engine A's screen (st patch).
+extern int FfccHudSeen;
 // The HUD's clusters go to their side in the top and bottom bands, the bottom bar stays at the left (Phantom Hourglass).
 extern int FfccHudSides;
 // Stable texture mapping: quads with texture coordinates no perspective transform fits are cut into a grid.
