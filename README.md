@@ -14,6 +14,9 @@ ARM9 code is statically recompiled to C and compiled ahead of time instead of em
   <img src="docs/images/phone-16x9-compute-4x.png" width="49%" alt="Phone: 16:9 rendering with Compute at 4x">
   <img src="docs/images/pc-menu.jpg" width="49%" alt="PC: the side menu (F1) over the game">
 </p>
+<p>
+  <img src="docs/images/phone-minimap-temple.jpg" width="100%" alt="Phone: 21:9 in the Temple of the Ocean King, with the minimap of the floor map and sand timer in the corner">
+</p>
 
 ## Features
 
@@ -25,6 +28,9 @@ ARM9 code is statically recompiled to C and compiled ahead of time instead of em
 - Language selector: English, French and Spanish, plus German and Italian on Europe dumps
 - Touch, keyboard and gamepad; analog-stick movement; mic and blow buttons
 - Android: movable on-screen controls, portrait mode with both screens stacked
+- Android: a minimap of the other screen in the bottom-left corner (landscape), like a game's corner map: tap it to
+  swap the screens, hold it to move it, pinch it to resize it, or hide it with the MAP button. It moves above dialogue
+  boxes and hides in cutscenes.
 
 Tested devices and fps measurements: [docs/TESTED.md](docs/TESTED.md).
 
@@ -81,7 +87,8 @@ Without Nix, install CMake 3.28+, Ninja, GCC and SDL3's build dependencies, then
 M = mic (shout), N = blow, C = close the lid. F1 or Esc opens the menu. F5/F8 save/load a state, F9 continues.
 Tab/F2 switch screens, F11 fullscreen, \` (hold) fast-forward. Gamepads work too.
 
-**Android:** touch is the stylus. The small buttons are the menu (≡), TOP (top screen), ⟳ (portrait), MIC, BLOW and LID.
+**Android:** touch is the stylus. The small buttons are the menu (≡), TOP (top screen), ⟳ (portrait), MAP (the minimap), MIC, BLOW and
+LID.
 The menu has the renderer, save states and "Move and resize controls".
 
 ## Testing and reporting issues
