@@ -88,6 +88,9 @@ std::atomic<bool> compute_failed{false};
 std::atomic<bool> resume_done{false};
 std::atomic<int> wide_mode{-1};
 std::atomic<int> hd_text{-1};
+std::atomic<int> map_x{0}, map_y{0}, map_w{0}, map_h{0};
+std::atomic<bool> map_hidden{false};
+std::atomic<int> map_dy{0};
 std::atomic<ph::Achievements*> achievements{nullptr};
 }  // namespace ph::pad
 
@@ -743,6 +746,40 @@ private:
             const bool wide_bot = extra > 0 && frame.wide_layer == 1;
             gl_->draw_hd_text(1, v.bottom, wide_bot ? extra : 0, wide_bot ? frame_hud.data() : nullptr,
                               wide_bot ? frame_hud_count : 0);
+        }
+        // The minimap: the screen not shown, small, where the phone's pad put it (ph::pad::map_*), like a game's
+        // corner map. The same picture as that screen would show, kept to its own shape inside the rectangle.
+        // (Hidden while the game shows no HUD for half a second: cutscenes. DsPad hides its frame too.)
+        ph::pad::map_hidden.store(frame.hud_absent >= 30);
+        if (v.top_shown != v.bottom_shown && ph::pad::map_w.load() > 0 && ph::pad::map_h.load() > 0 && frame.hud_absent < 30) {
+            const int layer = v.top_shown ? 1 : 0;
+            const int layer_extra = layer == frame.wide_layer ? extra : 0;
+            const float aspect = (256.0f + 2.0f * float(layer_extra)) / 192.0f;
+            const float bx = float(ph::pad::map_x.load()), by = float(ph::pad::map_y.load());
+            const float bw = float(ph::pad::map_w.load()), bh = float(ph::pad::map_h.load());
+            ph::Rect r{bx, by, bw, bh};
+            if (bw / bh > aspect) r.w = bh * aspect, r.x = bx;  // (anchored to the corner it sits in: left and bottom)
+            else r.h = bw / aspect, r.y = by + bh - r.h;
+            // A text box under it (dialogue, a choice): the minimap goes up, just above the highest such box.
+            {
+                const ph::Rect& main_r = v.top_shown ? v.top : v.bottom;
+                const int main_layer = v.top_shown ? 0 : 1;
+                const int main_extra = main_layer == frame.wide_layer ? extra : 0;
+                const float mx = main_r.w / (256.0f + 2.0f * float(main_extra)), my = main_r.h / 192.0f;
+                std::vector<ph::TextBox> boxes;
+                ph::text_boxes(main_layer, boxes);
+                float bottom = r.y + r.h;
+                for (const ph::TextBox& b : boxes) {
+                    const float x0 = main_r.x + (b.x0 + float(main_extra)) * mx, x1 = main_r.x + (b.x1 + float(main_extra)) * mx;
+                    const float y0 = main_r.y + b.y0 * my, y1 = main_r.y + b.y1 * my;
+                    if (x0 < r.x + r.w && x1 > r.x && y0 < bottom && y1 > r.y) bottom = std::min(bottom, y0 - 6.0f);
+                }
+                const float dy = std::min(0.0f, std::max(bottom - r.h, 0.0f) - r.y);
+                r.y += dy;
+                ph::pad::map_dy.store(int(std::lround(dy)));
+            }
+            gl_->screen(frame, layer, r, view.smooth, extra > 0);
+            gl_->draw_hd_text(layer, r, layer_extra, layer_extra ? frame_hud.data() : nullptr, layer_extra ? frame_hud_count : 0);
         }
         // Frames per second: the game's frames shown, counted over a second.
         if (count_game_frame) fps_frames_++;

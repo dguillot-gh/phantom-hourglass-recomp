@@ -27,6 +27,9 @@ struct HdGlyph {
     float slot_w = 8.0f;     // DS glyph visual width (DS pixels)
     float char_w = 8.0f;     // DS character advance width (DS pixels)
     uint32_t argb = 0xFFFFFFFFu;
+    // The whole text box on the DS screen (its canvas: x0, y0, x1, y1): its letters follow a widescreen HUD move only
+    // when all of it is inside the moved piece (a choice bubble beside the train lever stays whole).
+    float box_x0 = 0.0f, box_y0 = 0.0f, box_x1 = 0.0f, box_y1 = 0.0f;
 };
 
 void set_hd_text_enabled(bool enabled);
@@ -37,6 +40,13 @@ const stbtt_fontinfo* hd_font_info();
 
 // Clear tracked canvases and visible draw lists (call after loading a save state).
 void hd_text_reset();
+
+// The text boxes shown on `layer` this frame (DS pixels: x0, y0, x1, y1), HD text on or off: the minimap keeps
+// out of them (main.cpp).
+struct TextBox {
+    float x0, y0, x1, y1;
+};
+void text_boxes(int layer, std::vector<TextBox>& out);
 
 // Copy the glyphs currently visible on `layer` (0 = top screen, 1 = bottom screen).
 void hd_text_draw_list(int layer, std::vector<HdGlyph>& out);

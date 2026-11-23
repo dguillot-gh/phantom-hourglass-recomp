@@ -370,7 +370,9 @@ void GlPresenter::draw_hd_text(int layer, const Rect& where, int wide_extra, con
         const float ds_y = g.ds_y;
         for (int i = 0; i < hud_count; ++i) {
             const HudMove& m = hud[i];
-            if (ds_y >= float(m.y0) && ds_y < float(m.y1) && ds_x >= float(m.x0) && ds_x < float(m.x1)) {
+            // (The whole box inside the moved piece, not just this letter: ph_text.hpp.)
+            if (g.box_x0 >= float(m.x0) - 1.0f && g.box_x1 <= float(m.x1) + 1.0f && g.box_y0 >= float(m.y0) - 1.0f &&
+                g.box_y1 <= float(m.y1) + 1.0f) {
                 ds_x += float(m.dx);
                 break;
             }

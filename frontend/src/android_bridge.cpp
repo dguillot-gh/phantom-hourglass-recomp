@@ -31,6 +31,21 @@ extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeShowScreen(
     ph::pad::show.store(int(layout));
 }
 
+extern "C" JNIEXPORT jint JNICALL Java_com_phrecomp_ph_PhInput_nativeMapOffset(JNIEnv*, jclass) {
+    return jint(ph::pad::map_dy.load());
+}
+
+extern "C" JNIEXPORT jboolean JNICALL Java_com_phrecomp_ph_PhInput_nativeMapHidden(JNIEnv*, jclass) {
+    return ph::pad::map_hidden.load() ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetMap(JNIEnv*, jclass, jint x, jint y, jint w, jint h) {
+    ph::pad::map_x.store(int(x));
+    ph::pad::map_y.store(int(y));
+    ph::pad::map_h.store(int(h));
+    ph::pad::map_w.store(int(w));
+}
+
 extern "C" JNIEXPORT void JNICALL Java_com_phrecomp_ph_PhInput_nativeSetSmooth(JNIEnv*, jclass, jboolean on) {
     ph::pad::smooth.store(on != JNI_FALSE ? 1 : 0);
 }

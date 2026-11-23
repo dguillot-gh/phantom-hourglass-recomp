@@ -36,10 +36,10 @@ import java.util.List;
  * "hide_land_<id>" / "hide_port_<id>"). A control never moved keeps its place in the bars, as above.
  */
 public final class DsPad extends View {
-    private static final int KIND_BUTTON = 0, KIND_DPAD = 1, KIND_SHOULDER = 2, KIND_TOOL = 3;
+    private static final int KIND_BUTTON = 0, KIND_DPAD = 1, KIND_SHOULDER = 2, KIND_TOOL = 3, KIND_MAP = 4;
     private static final int LEFT = -1, RIGHT = 1;
     private static final int TOOL_MENU = 1, TOOL_MIC = 2, TOOL_LID = 3, TOOL_TOP = 4, TOOL_ROTATE = 5,
-            TOOL_MIC_SAMPLE = 6;
+            TOOL_MIC_SAMPLE = 6, TOOL_MAP = 7;
     private static final float HIT_GROW = 1.25f;  // a thumb lands off-centre: the hit area is a bit larger than the drawing
     static final String PREFS = "ph_pad";
 
@@ -78,6 +78,8 @@ public final class DsPad extends View {
             {"lid", "Lid button", "1"},
             {"top", "Top screen button", "1"},
             {"rotate", "Rotate button (portrait, both screens)", "1"},
+            {"map", "Minimap (the other screen; tap it to swap)", "1"},
+            {"mapbutton", "Minimap button (shows / hides it)", "1"},
     };
     private static final float[] OPACITY = {0.85f, 0.6f, 0.4f, 0.25f};
     private static final float[] SIZE = {0.85f, 1.0f, 1.2f};
@@ -118,6 +120,8 @@ public final class DsPad extends View {
         controls.add(new Control(KIND_TOOL, 0, TOOL_MENU, "menu", "≡", null, LEFT, 0.07f, 0.08f, 0.05f));
         controls.add(new Control(KIND_TOOL, 0, TOOL_TOP, "top", "TOP", "top", LEFT, 0.19f, 0.08f, 0.05f));
         controls.add(new Control(KIND_TOOL, 0, TOOL_ROTATE, "rotate", "⟳", "rotate", LEFT, 0.31f, 0.08f, 0.05f));
+        // Under the menu button (landscape): shows or hides the minimap, the same switch as the menu's "Minimap".
+        controls.add(new Control(KIND_TOOL, 0, TOOL_MAP, "mapbutton", "MAP", "mapbutton", LEFT, 0.07f, 0.19f, 0.05f));
         // Right bar: A B X Y in the DS's own places, R, Start, and the Mic and Lid buttons above.
         controls.add(new Control(KIND_BUTTON, PhInput.A, 0, "a", "A", "face", RIGHT, 0.10f, 0.62f, 0.065f));
         controls.add(new Control(KIND_BUTTON, PhInput.B, 0, "b", "B", "face", RIGHT, 0.24f, 0.76f, 0.065f));
@@ -128,6 +132,8 @@ public final class DsPad extends View {
         controls.add(new Control(KIND_TOOL, 0, TOOL_MIC, "mic", "MIC", "mic", RIGHT, 0.07f, 0.08f, 0.05f));
         controls.add(new Control(KIND_TOOL, 0, TOOL_LID, "lid", "LID", "lid", RIGHT, 0.19f, 0.08f, 0.05f));
         controls.add(new Control(KIND_TOOL, 0, TOOL_MIC_SAMPLE, "mic_sample", "BLOW", "mic_sample", RIGHT, 0.31f, 0.08f, 0.05f));
+        // The minimap: the screen not shown, small, in the bottom-left corner (landscape), like a game's corner map.
+        controls.add(new Control(KIND_MAP, 0, 0, "map", "MAP", "map", LEFT, 0f, 0f, 0f));
         text.setTextAlign(Paint.Align.CENTER);
         text.setFakeBoldText(true);
         edge.setStyle(Paint.Style.STROKE);
@@ -294,7 +300,7 @@ public final class DsPad extends View {
     private float reach() {
         float m = 0.3f;
         for (Control c : controls) {
-            if (!groupOn(c.group)) continue;
+            if (!groupOn(c.group) || c.kind == KIND_MAP) continue;
             m = Math.max(m, (c.x + c.r * (c.kind == KIND_SHOULDER ? 1.8f : 1f)) * scaleOf(c));
         }
         return m;
@@ -305,6 +311,7 @@ public final class DsPad extends View {
     private float radius(Control c) { return c.r * unit() * scaleOf(c) * (c.moved ? c.mScale : 1f); }
 
     private float cx(Control c) {
+        if (c.kind == KIND_MAP) return mapRect(c).centerX();
         if (c.moved) {
             final float off = c.mx * getHeight();
             return c.mSide == LEFT ? off : getWidth() - off;
@@ -313,9 +320,122 @@ public final class DsPad extends View {
         return c.side == LEFT ? off : getWidth() - off;
     }
 
-    private float cy(Control c) { return c.moved ? c.my * getHeight() : areaTop() + c.y * areaHeight(); }
+    private float cy(Control c) {
+        if (c.kind == KIND_MAP) return mapRect(c).centerY();
+        return c.moved ? c.my * getHeight() : areaTop() + c.y * areaHeight();
+    }
+
+    // ---- the minimap --------------------------------------------------------------------------------------------------
+    // Its place by default, from this phone's screen: the bottom-left corner, 4:3, as large as the left bar allows under
+    // the D-pad (at least a sixth of the screen's height: over the D-pad's lower edge on a short bar). Moved or resized
+    // in the editor, it keeps that size times the editor's factor, centred where it was put.
+    private RectF defaultMapRect() {
+        final float h = getHeight(), m = h * 0.015f;
+        float top = h * 0.5f;
+        for (Control c : controls)
+            if (c.kind == KIND_DPAD && visible(c)) top = cy(c) + radius(c) + m;
+        final float bar = Math.max(areaWidth() - 2f * m, h * 0.2f);
+        final float mh = Math.max(h * 0.16f, Math.min(h - m - top, bar * 0.75f));
+        final RectF r = new RectF(m, h - m - mh, m + mh * 4f / 3f, h - m);
+        // A button switched on down there (Select, a moved one) stays clear: the map starts right of it.
+        for (Control c : controls) {
+            if (c.kind == KIND_MAP || c.kind == KIND_DPAD || !visible(c)) continue;
+            final float x = cx(c), y = cy(c), rad = radius(c) * (c.kind == KIND_SHOULDER ? 1.8f : 1f);
+            if (x - rad < r.right && x + rad > r.left && y + rad > r.top && y - rad < r.bottom && x < getWidth() / 2f)
+                r.offsetTo(Math.max(r.left, x + rad + m), r.top);
+        }
+        return r;
+    }
+
+    private RectF mapRect(Control c) {
+        final RectF d = defaultMapRect();
+        if (!c.moved) return d;
+        final float hw = d.width() / 2f * c.mScale, hh = d.height() / 2f * c.mScale;
+        final float x = c.mSide == LEFT ? c.mx * getHeight() : getWidth() - c.mx * getHeight(), y = c.my * getHeight();
+        return new RectF(x - hw, y - hh, x + hw, y + hh);
+    }
+
+    private boolean mapShown(Control c) { return !portrait() && !bothShown && groupOn(c.group) && !c.hidden; }
+
+    // The game hides its HUD (cutscenes): the frontend then leaves the minimap out, and so do its frame and its tap.
+    // Asked a few times a second while the minimap is on.
+    private boolean mapHidden;
+    private int mapDy;  // the frontend draws it this far up (a text box under its place)
+
+    // The minimap as drawn now: its place, slid up above a text box.
+    private RectF mapShownRect(Control c) {
+        final RectF rr = mapRect(c);
+        rr.offset(0, mapDy);
+        return rr;
+    }
+    private final Runnable mapPoll = new Runnable() {
+        @Override
+        public void run() {
+            final boolean h = PhInput.nativeMapHidden();
+            final int dy = PhInput.nativeMapOffset();
+            if (h != mapHidden || dy != mapDy) {
+                mapHidden = h;
+                mapDy = dy;
+                invalidate();
+            }
+            postDelayed(this, 100);
+        }
+    };
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        postDelayed(mapPoll, 250);
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        removeCallbacks(mapPoll);
+        super.onDetachedFromWindow();
+    }
+
+    private final int[] sentMap = {-1, -1, -1, -1};
+
+    // Tells the frontend where to draw the minimap (nothing: width 0).
+    private void sendMap() {
+        int x = 0, y = 0, mw = 0, mh = 0;
+        for (Control c : controls) {
+            if (c.kind != KIND_MAP || !mapShown(c)) continue;
+            final RectF rr = mapRect(c);
+            x = Math.round(rr.left);
+            y = Math.round(rr.top);
+            mw = Math.round(rr.width());
+            mh = Math.round(rr.height());
+        }
+        if (x == sentMap[0] && y == sentMap[1] && mw == sentMap[2] && mh == sentMap[3]) return;
+        sentMap[0] = x;
+        sentMap[1] = y;
+        sentMap[2] = mw;
+        sentMap[3] = mh;
+        PhInput.nativeSetMap(x, y, mw, mh);
+    }
+
+    private void drawMap(Canvas canvas, Control c, int alpha) {
+        final RectF rr = editing ? mapRect(c) : mapShownRect(c);
+        final float corner = rr.height() * 0.06f;
+        if (editing) {  // (in the editor: show where it is)
+            fill.setColor(0xFF203040);
+            fill.setAlpha(alpha);
+            canvas.drawRoundRect(rr, corner, corner, fill);
+            text.setColor(0xFFFFFFFF);
+            text.setAlpha(alpha);
+            text.setTextSize(rr.height() * 0.2f);
+            canvas.drawText("MAP", rr.centerX(), rr.centerY() + rr.height() * 0.07f, text);
+        }
+        edge.setColor(0xFFFFFFFF);
+        edge.setAlpha(Math.min(255, alpha));
+        edge.setStrokeWidth(Math.max(2f, getHeight() * 0.004f));
+        canvas.drawRoundRect(rr, corner, corner, edge);
+    }
 
     private boolean visible(Control c) {
+        if (c.kind == KIND_MAP) return mapShown(c) && !mapHidden;
+        if (c.tool == TOOL_MAP && portrait()) return false;  // (portrait shows both screens: no minimap)
         return groupOn(c.group) && !c.hidden && (!hiddenForController || c.kind == KIND_TOOL);
     }
 
@@ -327,6 +447,13 @@ public final class DsPad extends View {
         float bestD = Float.MAX_VALUE;
         for (Control c : controls) {
             if (editing ? !shownInEditor(c) : !visible(c)) continue;
+            if (c.kind == KIND_MAP) {
+                if (!portrait() && !bothShown && (editing ? mapRect(c) : mapShownRect(c)).contains(x, y) && best == null) {
+                    best = c;
+                    bestD = Float.MAX_VALUE / 2;  // (a round control over it still wins)
+                }
+                continue;
+            }
             final float dx = x - cx(c), dy = y - cy(c), d = (float) Math.hypot(dx, dy);
             final float reach = radius(c) * (c.kind == KIND_SHOULDER ? 1.6f : 1f) * HIT_GROW;
             if (d <= reach && d < bestD) {
@@ -354,6 +481,7 @@ public final class DsPad extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         ensureLayout();
+        sendMap();
         if (editing) canvas.drawColor(0x66000000);
         final int full = Math.round(255 * opacity());
         for (Control c : controls) {
@@ -366,14 +494,21 @@ public final class DsPad extends View {
                     else drawDpad(canvas, c, alpha);
                     break;
                 case KIND_SHOULDER: drawShoulder(canvas, c, pressed, alpha); break;
+                case KIND_MAP: if (!portrait() && !bothShown) drawMap(canvas, c, alpha); break;
                 default: drawRound(canvas, c, pressed, alpha); break;
             }
             if (editing && c == selected) {  // the selected one: a ring around it
                 edge.setColor(0xFF8AB4FF);
                 edge.setAlpha(255);
                 edge.setStrokeWidth(unit() * 0.012f);
-                final float r = radius(c) * (c.kind == KIND_SHOULDER ? 1.9f : 1.15f);
-                canvas.drawCircle(cx(c), cy(c), r, edge);
+                if (c.kind == KIND_MAP) {
+                    final RectF rr = new RectF(mapRect(c));
+                    rr.inset(-unit() * 0.012f, -unit() * 0.012f);
+                    canvas.drawRect(rr, edge);
+                } else {
+                    final float r = radius(c) * (c.kind == KIND_SHOULDER ? 1.9f : 1.15f);
+                    canvas.drawCircle(cx(c), cy(c), r, edge);
+                }
             }
         }
         if (editing) drawToolbar(canvas);
@@ -413,6 +548,8 @@ public final class DsPad extends View {
             case "dpad": return "D-pad / stick";
             case "menu": return "menu button (always shown)";
             case "rotate": return "Rotate button";
+            case "map": return "minimap";
+            case "mapbutton": return "Minimap button";
             default: return c.label + " button";
         }
     }
@@ -423,6 +560,7 @@ public final class DsPad extends View {
         if (c.tool == TOOL_LID) return lidClosed;
         if (c.tool == TOOL_TOP) return topShown;
         if (c.tool == TOOL_ROTATE) return portrait();
+        if (c.tool == TOOL_MAP) return groupOn("map");  // (lit while the minimap is shown)
         for (int i = 0; i < fingers.size(); i++)
             if (fingers.valueAt(i) == c) return true;
         return false;
@@ -519,6 +657,10 @@ public final class DsPad extends View {
     public boolean onTouchEvent(MotionEvent e) {
         final int action = e.getActionMasked();
         if (editing) return editTouch(e, action);
+        if (mapTouch(e, action)) {
+            invalidate();
+            return true;
+        }
         switch (action) {
             case MotionEvent.ACTION_DOWN:
             case MotionEvent.ACTION_POINTER_DOWN: {
@@ -547,8 +689,139 @@ public final class DsPad extends View {
         return true;
     }
 
+    // ---- the minimap's own gestures (not in the editor) -----------------------------------------------------------------
+    // A tap swaps the screens; held still for a moment it follows the finger (moved); a second finger then pinches its
+    // size. Kept like the editor's moves ("lay_land_map"). True when the event was the minimap's.
+    private static final int MAP_IDLE = 0, MAP_PRESS = 1, MAP_DRAG = 2, MAP_PINCH = 3;
+    private int mapState = MAP_IDLE, mapPointer = -1, pinchPointer = -1;
+    private float mapDownX, mapDownY, mapStartCx, mapStartCy, pinchStartDist, pinchStartScale;
+    private final Runnable mapLongPress = () -> {
+        if (mapState != MAP_PRESS) return;
+        mapState = MAP_DRAG;
+        performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+        invalidate();
+    };
+
+    private Control mapControl() {
+        for (Control c : controls)
+            if (c.kind == KIND_MAP) return c;
+        return null;
+    }
+
+    private void placeMap(Control c, float centreX, float centreY) {
+        final float w = getWidth(), h = getHeight();
+        centreX = Math.max(0, Math.min(w, centreX));
+        centreY = Math.max(0, Math.min(h, centreY));
+        if (!c.moved) c.mScale = 1f;
+        c.moved = true;
+        c.mSide = centreX < w / 2f ? LEFT : RIGHT;
+        c.mx = (c.mSide == LEFT ? centreX : w - centreX) / h;
+        c.my = centreY / h;
+    }
+
+    private static float distance(MotionEvent e, int a, int b) {
+        final int ia = e.findPointerIndex(a), ib = e.findPointerIndex(b);
+        if (ia < 0 || ib < 0) return 0f;
+        return (float) Math.hypot(e.getX(ia) - e.getX(ib), e.getY(ia) - e.getY(ib));
+    }
+
+    private boolean mapTouch(MotionEvent e, int action) {
+        final Control m = mapControl();
+        if (m == null) return false;
+        final float slop = getHeight() * 0.02f;
+        switch (action) {
+            case MotionEvent.ACTION_DOWN: {
+                final Control c = controlAt(e.getX(0), e.getY(0));
+                if (c != m) return false;
+                mapState = MAP_PRESS;
+                mapPointer = e.getPointerId(0);
+                mapDownX = e.getX(0);
+                mapDownY = e.getY(0);
+                final RectF rr = mapRect(m);
+                mapStartCx = rr.centerX();
+                mapStartCy = rr.centerY();
+                postDelayed(mapLongPress, 400);
+                return true;
+            }
+            case MotionEvent.ACTION_POINTER_DOWN: {
+                if (mapState == MAP_IDLE) return false;
+                if (pinchPointer >= 0) return true;
+                removeCallbacks(mapLongPress);
+                pinchPointer = e.getPointerId(e.getActionIndex());
+                pinchStartDist = Math.max(1f, distance(e, mapPointer, pinchPointer));
+                final RectF rr = mapRect(m);
+                placeMap(m, rr.centerX(), rr.centerY());  // (from here its size is the editor's factor)
+                pinchStartScale = m.mScale;
+                mapState = MAP_PINCH;
+                return true;
+            }
+            case MotionEvent.ACTION_MOVE: {
+                if (mapState == MAP_IDLE) return false;
+                final int i = e.findPointerIndex(mapPointer);
+                if (i < 0) return true;
+                final float dx = e.getX(i) - mapDownX, dy = e.getY(i) - mapDownY;
+                if (mapState == MAP_PRESS && Math.hypot(dx, dy) > slop) {
+                    removeCallbacks(mapLongPress);  // (moved before the long press: just a swipe, nothing happens)
+                    mapState = MAP_IDLE;
+                    mapPointer = -1;
+                    return true;
+                }
+                if (mapState == MAP_DRAG) placeMap(m, mapStartCx + dx, mapStartCy + dy);
+                if (mapState == MAP_PINCH) {
+                    final float d = distance(e, mapPointer, pinchPointer);
+                    if (d > 0) m.mScale = Math.max(0.5f, Math.min(3f, pinchStartScale * d / pinchStartDist));
+                }
+                return true;
+            }
+            case MotionEvent.ACTION_POINTER_UP: {
+                if (mapState == MAP_IDLE) return false;
+                final int id = e.getPointerId(e.getActionIndex());
+                if (id == pinchPointer) {
+                    pinchPointer = -1;
+                    saveLayout();
+                    mapState = MAP_DRAG;
+                    final int i = e.findPointerIndex(mapPointer);
+                    if (i >= 0) {  // (go on dragging from here)
+                        mapDownX = e.getX(i);
+                        mapDownY = e.getY(i);
+                        final RectF rr = mapRect(m);
+                        mapStartCx = rr.centerX();
+                        mapStartCy = rr.centerY();
+                    }
+                } else if (id == mapPointer) {
+                    finishMap(m, false);
+                }
+                return true;
+            }
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL: {
+                if (mapState == MAP_IDLE) return false;
+                finishMap(m, action == MotionEvent.ACTION_UP);
+                return true;
+            }
+            default:
+                return mapState != MAP_IDLE;
+        }
+    }
+
+    private void finishMap(Control m, boolean tapAllowed) {
+        removeCallbacks(mapLongPress);
+        if (mapState == MAP_PRESS && tapAllowed) {  // a tap: swap the screens
+            performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+            setScreen(topShown ? PhInput.SCREEN_TOUCH : PhInput.SCREEN_TOP);
+        } else if (mapState == MAP_DRAG || mapState == MAP_PINCH) {
+            saveLayout();
+        }
+        mapState = MAP_IDLE;
+        mapPointer = pinchPointer = -1;
+    }
+
     private void press(int id, Control c, float x, float y) {
         performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+        if (c.kind == KIND_MAP) {  // a tap on the minimap swaps the screens
+            setScreen(topShown ? PhInput.SCREEN_TOUCH : PhInput.SCREEN_TOP);
+            return;
+        }
         if (c.kind == KIND_TOOL) {
             switch (c.tool) {
                 case TOOL_MENU: if (menu != null) menu.open(); return;
@@ -559,6 +832,7 @@ public final class DsPad extends View {
                 case TOOL_ROTATE:
                     if (activity instanceof GameActivity) ((GameActivity) activity).setPortrait(!portrait());
                     return;
+                case TOOL_MAP: setGroup("map", !groupOn("map")); return;
                 default: return;
             }
         }

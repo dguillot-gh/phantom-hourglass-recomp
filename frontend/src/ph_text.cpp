@@ -53,6 +53,8 @@ std::mutex g_mutex;
 std::unordered_map<uint32_t, ObjCanvas> g_canvases;
 std::vector<PendingEntry> g_pending[2];  // indexed by 2D engine (0 = A, 1 = B)
 std::vector<HdGlyph> g_visible[2];       // indexed by screen layer (0 = top, 1 = bottom)
+std::vector<TextBox> g_box_pending[2];   // the text boxes drawn this frame, by 2D engine
+std::vector<TextBox> g_box_visible[2];   // ... as shown, by screen layer
 
 stbtt_fontinfo g_font{};
 std::atomic<int> g_font_state{0};  // 0 uninit, 1 ready, -1 failed
@@ -211,6 +213,13 @@ void hd_text_reset() {
     g_visible[1].clear();
 }
 
+void text_boxes(int layer, std::vector<TextBox>& out) {
+    out.clear();
+    if (layer < 0 || layer > 1) return;
+    std::lock_guard<std::mutex> lock(g_mutex);
+    out = g_box_visible[layer];
+}
+
 void hd_text_draw_list(int layer, std::vector<HdGlyph>& out) {
     out.clear();
     if (layer < 0 || layer > 1) return;
@@ -326,8 +335,13 @@ extern "C" void ph_text_obj_draw(NtrCpu* c) {
     const int engine = (ntr_rd8(c, ph::kSingleEngineFlag) != 0) ? 0 : (ntr_rd8(c, this_obj + 80u) ? 1 : 0);
     // Exact 4-bit hardware OBJ palette from sprite 0's OAM attr2 at this + 88 (bits 12..15).
     const uint8_t pal_idx = static_cast<uint8_t>((ntr_rd16(c, this_obj + 88u) >> 12) & 0xFu);
+    // The box: its CharCanvas (at this + 0x10) is areaWidth x areaHeight characters (after charBase).
+    const int32_t box_w = int32_t(ntr_rd32(c, this_obj + 0x10u + 4u)) * 8, box_h = int32_t(ntr_rd32(c, this_obj + 0x10u + 8u)) * 8;
 
     std::lock_guard<std::mutex> lock(ph::g_mutex);
+    // Where the box is, for the minimap (with HD text off too).
+    if (box_w > 0 && box_h > 0 && box_w <= 512 && box_h <= 384)
+        ph::g_box_pending[engine].push_back({float(screen_x), float(screen_y), float(screen_x + box_w), float(screen_y + box_h)});
     auto it = ph::g_canvases.find(this_obj);
     if (it == ph::g_canvases.end() || it->second.glyphs.empty()) return;
 
@@ -342,6 +356,10 @@ extern "C" void ph_text_obj_draw(NtrCpu* c) {
         e.glyph.baseline = float(g.baseline);
         e.glyph.slot_w = float(g.glyph_w);
         e.glyph.char_w = float(g.char_w);
+        e.glyph.box_x0 = float(screen_x);
+        e.glyph.box_y0 = float(screen_y);
+        e.glyph.box_x1 = float(screen_x + std::clamp(box_w, 0, 512));
+        e.glyph.box_y1 = float(screen_y + std::clamp(box_h, 0, 384));
         e.pal_idx = pal_idx;
         // 2bpp NFTR: v=1..3 maps to palette cl + v - 1; solid fill (v=3) is (cl + 2) & 0xF.
         e.solid_color_idx = static_cast<uint8_t>((g.bpp >= 2 ? (g.color_idx + 2u) : g.color_idx) & 0xFu);
@@ -372,6 +390,9 @@ extern "C" void ph_text_oam_flush(NtrCpu* c) {
     auto& pending = ph::g_pending[engine];
     auto& visible = ph::g_visible[layer];
     visible.clear();
+    ph::g_box_visible[layer].clear();
+    if (obj_on && !(bright_mode != 0 && bright_factor >= 16)) ph::g_box_visible[layer] = ph::g_box_pending[engine];
+    ph::g_box_pending[engine].clear();
 
     if (obj_on && !pending.empty() && !(bright_mode != 0 && bright_factor >= 16)) {
         visible.reserve(pending.size());

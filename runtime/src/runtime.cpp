@@ -361,6 +361,7 @@ void RuntimeImpl::end_frame() {
         frame.scale = video_.scale;
         frame.wide_extra = video_.wide_extra;
         frame.wide_layer = n.GPU.ScreenSwap ? 0 : 1;  // (POWCNT1 bit 15: engine A on the top screen)
+        frame.hud_absent = melonDS::FfccHudSeen;
         if (melonDS::FfccHudEdges) {
             frame.hud_moves = std::clamp(melonDS::FfccHudMovedCount, 0, 32);
             for (int i = 0; i < frame.hud_moves; i++) {
