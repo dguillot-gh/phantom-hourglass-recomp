@@ -15,6 +15,8 @@ main 0200dc98 replace ntr_nitro_init_context   # OS_InitContext
 main 02005bfc before ph_perspective_aspect      # G3i_PerspectiveW_
 # Widescreen: the camera's view planes, which decide which actors are drawn (frontend/src/ph_hooks.cpp).
 ov000 02087070 before ph_camera_planes          # camera: side planes of the view from its fov and aspect
+# Temple of the Ocean King floor checkpoints (frontend/src/ph_temple.cpp): the exit Link takes.
+ov000 0208033c instead ph_find_exit             # MapBase::FindExit
 
 # IRQ dispatch: enters OS_IrqHandler_ThreadSwitch explicitly (game/src/ph_hooks.cpp).
 itcm 01ffa48c replace ph_os_irq_handler        # OS_IrqHandler

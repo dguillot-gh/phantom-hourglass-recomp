@@ -53,6 +53,7 @@
 #include "ph_stick.hpp"
 #include "perf_hint.hpp"
 #include "ph_hooks.hpp"
+#include "ph_temple.hpp"
 #include "ph_text.hpp"
 #include "png.hpp"
 #include "gl_present.hpp"
@@ -538,6 +539,8 @@ public:
         if (const int slot = s_.state_load.exchange(0)) start_load(slot);
         ntr::set_mic_blow(blow);
         ntr::set_mic_sample(blow_sample);
+        if (const uint32_t picker = ph::temple::frame([this](uint32_t a) { return rt_->peek32(a); }, live ? held | pressed : 0u))
+            held &= ~picker, pressed &= ~picker;  // (the temple hall's floor picker takes L and R)
         rt_->set_buttons(held, pressed);
         if (touching)
             rt_->touch(std::clamp(tx, 0, kW - 1), std::clamp(ty, 0, kH - 1));
@@ -806,6 +809,13 @@ private:
             const float by = (corner & 2) ? pic.y + pic.h - bh - 4 * ui : pic.y + 4 * ui;
             gl_->fill({bx, by, bw, bh}, 0xA0000000);
             gl_->text(bx + 4 * ui, by + 4 * ui, size, text, 0xFFFFFFFF);
+        }
+        if (const std::string pick = ph::temple::picker_text(); !pick.empty()) {  // the lobby's floor picker
+            const ph::Rect pic = v.top_shown ? v.top : v.bottom;
+            const float size = 14 * ui, tw = size * float(pick.size());
+            const float x = pic.x + std::max(4 * ui, (pic.w - tw) / 2), y = pic.y + 28 * ui;
+            gl_->fill({x - 8 * ui, y - 8 * ui, tw + 16 * ui, size + 16 * ui}, 0xC0000000);
+            gl_->text(x, y, size, pick, 0xFFFFFFFF);
         }
         if (const std::string note = s_.current_note(); !note.empty()) {  // "Saved to slot 3"
             const float size = 12 * ui, tw = size * float(note.size());
@@ -1110,6 +1120,7 @@ int main(int argc, char** argv) {
             rom_path = base / "rom" / "azee.nds";
     }
     const fs::path settings_path = data_dir / "settings.ini";
+    ph::temple::set_dir(data_dir);
 
     // ---- the ROM and the recompiled game ----
     std::vector<uint8_t> rom = read_file(rom_path);

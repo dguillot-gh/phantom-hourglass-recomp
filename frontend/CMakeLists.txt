@@ -41,7 +41,7 @@ if(ANDROID)
   target_link_options(ph_game PRIVATE -nostdlib)
 
   # SDL's Android activity loads the program as libmain.so and calls its SDL_main.
-  add_library(main SHARED src/main.cpp src/game_module.cpp src/ph_hooks.cpp src/ph_stick.cpp src/ph_text.cpp
+  add_library(main SHARED src/main.cpp src/game_module.cpp src/ph_hooks.cpp src/ph_stick.cpp src/ph_temple.cpp src/ph_text.cpp
               ${PH_HD_FONT_SRC} src/png.cpp src/android_bridge.cpp src/gl_present.cpp src/gles_compat.cpp
               src/achievements.cpp)
   target_include_directories(main PRIVATE src ${CMAKE_SOURCE_DIR}/third_party/stb)
@@ -103,7 +103,7 @@ else()
 endif()
 
 # ---- the program ----
-add_executable(PhantomHourglass src/main.cpp src/game_module.cpp src/ph_hooks.cpp src/ph_stick.cpp src/ph_text.cpp
+add_executable(PhantomHourglass src/main.cpp src/game_module.cpp src/ph_hooks.cpp src/ph_stick.cpp src/ph_temple.cpp src/ph_text.cpp
                ${PH_HD_FONT_SRC} src/png.cpp src/gl_present.cpp src/menu.cpp src/achievements.cpp)
 target_include_directories(PhantomHourglass PRIVATE src ${CMAKE_SOURCE_DIR}/third_party/stb)
 set_target_properties(PhantomHourglass PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
