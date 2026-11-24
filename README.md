@@ -36,6 +36,8 @@ ARM9 code is statically recompiled to C and compiled ahead of time instead of em
 
 Tested devices and fps measurements: [docs/TESTED.md](docs/TESTED.md).
 
+Ideas and features being considered next: [docs/WISHLIST.md](docs/WISHLIST.md).
+
 ## What you need
 
 - Your own dump. Supported (checked by SHA-1):
