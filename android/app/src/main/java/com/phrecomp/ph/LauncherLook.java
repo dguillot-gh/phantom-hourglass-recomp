@@ -37,9 +37,9 @@ import java.io.OutputStream;
  * changes): the same style as the KH Birth by Sleep port's launcher. The game's picture fills the screen behind a
  * left-to-right dark shade; the menu is a column on the left (title, two wide buttons, one row of small ones, a
  * settings line). The picture: one the player picked (Settings >
- * Choose background image, kept as files/launcher_bg.img), else the game's cover in the app (res/drawable-nodpi/
- * launcher_cover.png, shown as a case on a blurred copy), else the screenshot of the last Continue point
- * (files/states/resume.png, both DS screens). Gamepad: the D-pad moves the focus, A presses.
+ * Choose background image, kept as files/launcher_bg.img), else the screenshot of the last Continue point
+ * (files/states/resume.png, both DS screens), else the plain title card in the app (res/drawable-nodpi/
+ * launcher_cover.png, shown as a case on a blurred copy; no game art ships in the app). Gamepad: the D-pad moves the focus, A presses.
  */
 final class LauncherLook {
     static final int REQUEST_BACKGROUND = 41;
@@ -118,6 +118,12 @@ final class LauncherLook {
         scroll.addView(column);
         int width = upright ? -1 : Math.min(dp(MENU_WIDTH_DP), a.getResources().getDisplayMetrics().widthPixels);
         root.addView(scroll, new FrameLayout.LayoutParams(width, -1, Gravity.START));
+
+        // The version, bottom right on every start screen ("v0.2.0 (4527a78)").
+        TextView version = text("v" + BuildConfig.VERSION_NAME + " (" + BuildConfig.COMMIT + ")", 11, 0x99FFFFFF, false);
+        FrameLayout.LayoutParams vlp = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.END);
+        vlp.setMargins(0, 0, dp(16), dp(10));
+        root.addView(version, vlp);
 
         column.addView(text(title, 28, Color.WHITE, true));
         TextView sub = text(subtitle, 14, 0xFFB8C7E0, false);
@@ -258,10 +264,12 @@ final class LauncherLook {
                 (p.getBoolean("hd_text", false) ? "✓ " : "   ") + "HD dialogue text",
                 (p.getBoolean("stretch", false) ? "✓ " : "   ") + "Stretch to fill the screen",
                 (p.getBoolean("portrait", false) ? "✓ " : "   ") + "Hold the phone upright (both screens stacked)",
+                UpdateCheck.supported() ? (UpdateCheck.enabled(p) ? "✓ " : "   ") + "Check GitHub for app updates"
+                        : "   App updates: not for this build (made on a PC)",
                 "Choose background image…",
                 hasCustomBackground() ? "Use the game's cover again" : null,
         };
-        int n = items[8] == null ? 8 : 9;
+        int n = items[9] == null ? 9 : 10;
         String[] shown = java.util.Arrays.copyOf(items, n);
         dialog().setTitle("Settings").setItems(shown, (d, w) -> {
             switch (w) {
@@ -289,8 +297,12 @@ final class LauncherLook {
                 case 4: p.edit().putBoolean("hd_text", !p.getBoolean("hd_text", false)).apply(); break;
                 case 5: p.edit().putBoolean("stretch", !p.getBoolean("stretch", false)).apply(); break;
                 case 6: p.edit().putBoolean("portrait", !p.getBoolean("portrait", false)).apply(); break;
-                case 7: pickBackground(); return;
-                case 8: clearBackground(); changed.run(); return;
+                case 7:
+                    if (!UpdateCheck.supported()) return;
+                    p.edit().putBoolean(UpdateCheck.PREF_ON, !UpdateCheck.enabled(p)).apply();
+                    break;
+                case 8: pickBackground(); return;
+                case 9: clearBackground(); changed.run(); return;
                 default: return;
             }
             changed.run();
@@ -358,18 +370,19 @@ final class LauncherLook {
         return BitmapFactory.decodeFile(f.getAbsolutePath(), o);
     }
 
-    /** Picked picture, else the game's cover in the app (res/drawable-nodpi/launcher_cover), else the Continue screenshot. */
+    /** Picked picture, else the Continue screenshot, else the title card in the app (res/drawable-nodpi/launcher_cover). */
     private Bitmap background() {
         Bitmap b = decode(new File(a.getFilesDir(), BG_FILE));
         if (b != null) return b;
+        if ((b = decode(new File(a.getFilesDir(), "states/resume.png"))) != null) return b;
         int id = a.getResources().getIdentifier("launcher_cover", "drawable", a.getPackageName());
-        if (id != 0 && (b = BitmapFactory.decodeResource(a.getResources(), id)) != null) return b;
-        return decode(new File(a.getFilesDir(), "states/resume.png"));
+        return id != 0 ? BitmapFactory.decodeResource(a.getResources(), id) : null;
     }
 
     private boolean isCover(Bitmap pic) {
         if (hasCustomBackground()) return pic.getWidth() < pic.getHeight() * 1.2f;
-        return a.getResources().getIdentifier("launcher_cover", "drawable", a.getPackageName()) != 0;
+        return !new File(a.getFilesDir(), "states/resume.png").isFile()
+                && a.getResources().getIdentifier("launcher_cover", "drawable", a.getPackageName()) != 0;
     }
 
     /**

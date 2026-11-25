@@ -8,6 +8,10 @@
     <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- App updates only (UpdateCheck.java): ask GitHub for a newer release, download it, hand it to Android's
+         installer (which asks the player). Nothing from the game is downloaded. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:label="@string/app_name"
@@ -37,5 +41,10 @@
             android:configChanges="layoutDirection|locale|grammaticalGender|fontScale|fontWeightAdjustment|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation"
             android:preferMinimalPostProcessing="true"
             android:theme="@style/AppTheme" />
+
+        <!-- Android's installer reports back here during an app update (UpdateCheck). -->
+        <receiver
+            android:name=".UpdateCheck$Receiver"
+            android:exported="false" />
     </application>
 </manifest>

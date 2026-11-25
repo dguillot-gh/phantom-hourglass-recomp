@@ -337,6 +337,9 @@ void Menu::draw_panel(GlPresenter& gl, const MenuState& s, float win_w, float wi
     gl.fill({0, 0, win_w, win_h}, kShade);
     gl.fill(p, kPanel);
     gl.text(p.x + pad, pad, text * 1.4f, "Menu", kWhite);
+#ifdef PH_BUILD_LABEL
+    gl.text(p.x + pad + text * 1.4f * 5, pad + text * 0.3f, 8 * ui * 1.5f, PH_BUILD_LABEL, kHint);  // version (commit)
+#endif
     char rate[32];
     std::snprintf(rate, sizeof rate, "%.1f fps", double(fps));
     const float small = 8 * ui * 1.5f;

@@ -10,6 +10,22 @@ def sdlSource = slashes(project.findProperty('phSdlSource') ?: new File(repo, 'b
 // The CMake that local.properties' cmake.dir points at (5-BUILD-ANDROID.ps1 passes its version): the project needs 3.28+.
 def cmakeVersion = project.findProperty('phCmakeVersion') ?: '3.31.6'
 def ninja = project.findProperty('phNinja')
+// -PphShell: a shell APK, without the recompiled game: the launcher builds it on the phone from the player's ROM
+// (GameBuilder.java + libphbuild: the recompiler + TinyCC) into the app's files (game/libph_game.so).
+def shell = project.hasProperty('phShell')
+// Release builds (CI): one fixed key, so each new APK installs over the last one and keeps the player's saves.
+// -PphKeystore=<file> -PphKeystorePassword -PphKeyAlias -PphKeyPassword; without them, the usual debug key.
+def keystore = project.findProperty('phKeystore')
+// -PphVersionCode (must grow with every release: CI passes minutes since 2026), -PphVersionName (the tag),
+// -PphUpdateRepo (owner/name: the launcher checks that repo's GitHub Releases for a newer APK; empty: no check).
+def versionCodeProp = (project.findProperty('phVersionCode') ?: '1') as int
+def versionNameProp = project.findProperty('phVersionName') ?: '0.1.0'
+def updateRepo = project.findProperty('phUpdateRepo') ?: ''
+// The commit, shown on the start screen beside the version (CI passes -PphCommit; locally, git).
+def commit = project.findProperty('phCommit') ?: {
+    try { ['git', '-C', repo.path, 'rev-parse', '--short=7', 'HEAD'].execute().text.trim() ?: 'local' }
+    catch (Exception ignored) { 'local' }
+}()
 
 android {
     namespace = "com.phrecomp.ph"
@@ -19,8 +35,12 @@ android {
         applicationId "com.phrecomp.ph"
         minSdkVersion 26
         targetSdkVersion 35
-        versionCode 1
-        versionName "0.1.0"
+        versionCode versionCodeProp
+        versionName versionNameProp
+        buildConfigField "String", "UPDATE_REPO", "\"${updateRepo}\""
+        buildConfigField "String", "COMMIT", "\"${commit}\""
+        // A shell APK (-PphShell) has no game inside: the launcher builds the game module (libph_game.so).
+        buildConfigField "boolean", "SHELL", shell ? "true" : "false"
         externalNativeBuild {
             cmake {
                 arguments "-DANDROID_STL=c++_static", "-DANDROID_PLATFORM=android-26",
@@ -28,12 +48,28 @@ android {
                         "-DFETCHCONTENT_SOURCE_DIR_SDL3=${sdlSource}", "-DFETCHCONTENT_FULLY_DISCONNECTED=ON"
                 if (ninja) arguments "-DCMAKE_MAKE_PROGRAM=${slashes(ninja)}"
                 abiFilters 'arm64-v8a'
-                targets 'main', 'ph_game'
+                if (shell) {
+                    arguments "-DPH_SHELL=ON"
+                    targets 'main', 'phbuild'
+                } else {
+                    targets 'main', 'ph_game'
+                }
+            }
+        }
+    }
+    if (keystore) {
+        signingConfigs {
+            phRelease {
+                storeFile file(keystore)
+                storePassword project.findProperty('phKeystorePassword')
+                keyAlias project.findProperty('phKeyAlias')
+                keyPassword project.findProperty('phKeyPassword')
             }
         }
     }
     buildTypes {
         debug {
+            if (keystore) signingConfig signingConfigs.phRelease
             // The game and the engine are always optimised (CMake), so the debug APK plays at full speed.
             externalNativeBuild { cmake { arguments "-DCMAKE_BUILD_TYPE=Release" } }
         }
@@ -41,13 +77,32 @@ android {
             minifyEnabled false
         }
     }
+    // The shell APK's builder assets (GameBuilder.java unpacks them): TinyCC's headers, the runtime header the game's C
+    // includes, and the recompiler configs of both releases (functions/hooks/regions: no game data).
+    if (shell) {
+        sourceSets { main { assets.srcDirs += layout.buildDirectory.dir('phbuild-assets') } }
+    }
     externalNativeBuild {
         cmake {
             path '../../CMakeLists.txt'
             version cmakeVersion
         }
     }
+    buildFeatures {
+        buildConfig true  // (BuildConfig.SHELL, UPDATE_REPO, COMMIT)
+    }
     lint {
         abortOnError = false
     }
 }
+
+// The shell APK's builder assets, under build/phbuild-assets/phbuild/{tcc,rt,config/azee,config/azep}.
+tasks.register('phBuildAssets', Copy) {
+    def out = layout.buildDirectory.dir('phbuild-assets/phbuild')
+    into out
+    from(new File(repo, 'third_party/tinycc/include')) { into 'tcc/include' }
+    from(new File(repo, 'tools/ondevice')) { include '*.h'; into 'tcc/include' }
+    from(new File(repo, 'runtime/include')) { into 'rt' }
+    from(new File(repo, 'frontend/config')) { into 'config' }
+}
+if (shell) preBuild.dependsOn 'phBuildAssets'

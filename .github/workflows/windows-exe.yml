@@ -1,0 +1,145 @@
+# Builds PhantomHourglass.exe the way a player downloads it: the program only (recompiler + TinyCC + its build files
+# inside), no ROM and no game. On first run it asks for the player's own ROM and builds the game itself.
+name: Windows exe + Android shell APK
+# Runs only when asked: the "Run workflow" button (Actions tab), or pushing a tag named build-* (git tag build-N; git push <remote> build-N).
+on:
+  workflow_dispatch:
+  push:
+    tags: ['build-*', 'v*']  # v*: also publish a GitHub Release with the exe and the APK as plain files
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: llvm-mingw 20261020 (UCRT, x86_64; the version the local builds use, newer libc++ breaks melonDS)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download 20261020 -R mstorsjo/llvm-mingw -p '*-ucrt-x86_64.zip' -D "$RUNNER_TEMP"
+          7z x -y -o"$RUNNER_TEMP" "$RUNNER_TEMP"/llvm-mingw-*-ucrt-x86_64.zip > /dev/null
+          echo "$(cygpath -w "$(ls -d "$RUNNER_TEMP"/llvm-mingw-*-ucrt-x86_64 | head -1)")\\bin" >> "$GITHUB_PATH"
+      - name: Configure
+        run: |
+          cmake -S . -B build/ci -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_RC_COMPILER=windres \
+            "-DCMAKE_CXX_FLAGS=-include algorithm" -DFFCC_BUILD_TESTS=OFF
+      - name: Build
+        run: cmake --build build/ci --target PhantomHourglass -j 4
+      - name: Package
+        run: |
+          mkdir -p out/PhantomHourglass
+          cp build/ci/frontend/PhantomHourglass.exe LICENSE NOTICE.md out/PhantomHourglass/
+          llvm-objdump -p out/PhantomHourglass/PhantomHourglass.exe | grep "DLL Name" | sort -u
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PhantomHourglass-windows
+          path: out/PhantomHourglass
+  android:
+    # The shell APK: the program only (recompiler + TinyCC inside); the player imports their ROM and it builds on the phone.
+    runs-on: ubuntu-latest
+    outputs:
+      version_code: ${{ steps.version.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Version and signing key
+        id: version
+        env:
+          PH_KEYSTORE_B64: ${{ secrets.PH_KEYSTORE_B64 }}
+        run: |
+          # versionCode: minutes since 2026-01-01, so every build is newer than the last (Android installs updates only
+          # when it grows). versionName: the tag without its v (v0.2.0 -> 0.2.0), else 0.0.0-<commit>.
+          code=$(( ($(date +%s) - 1767225600) / 60 ))
+          name="0.0.0-${GITHUB_SHA::7}"; [[ "$GITHUB_REF" == refs/tags/v* ]] && name="${GITHUB_REF_NAME#v}"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          args="-PphVersionCode=$code -PphVersionName=$name -PphUpdateRepo=$GITHUB_REPOSITORY -PphCommit=${GITHUB_SHA::7}"
+          # The release key (repo secrets): every APK signed the same, so updates install over each other.
+          if [ -n "$PH_KEYSTORE_B64" ]; then
+            echo "$PH_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            args="$args -PphKeystore=$RUNNER_TEMP/release.jks"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            # Never publish a release with a throwaway key: it could not update, nor be updated.
+            echo "::error::No PH_KEYSTORE_B64 secret reached this job (Settings > Secrets and variables > Actions > Repository secrets)."
+            exit 1
+          else
+            echo "::warning::No PH_KEYSTORE_B64 secret: this APK is signed with a throwaway debug key and will not update over other builds."
+          fi
+          echo "PH_GRADLE_ARGS=$args" >> "$GITHUB_ENV"
+          echo "versionCode $code, versionName $name"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle  # (Gradle's downloads kept between runs: fewer requests to Maven Central)
+      - name: NDK + CMake
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358" "cmake;3.31.6" > /dev/null
+      - name: SDL source
+        run: git clone --depth 1 -b release-3.4.18 https://github.com/libsdl-org/SDL.git "$RUNNER_TEMP/sdl3-src"
+      - name: Build shell APK
+        env:
+          PH_KEYSTORE_PASSWORD: ${{ secrets.PH_KEYSTORE_PASSWORD }}
+          PH_KEY_ALIAS: ${{ secrets.PH_KEY_ALIAS }}
+          PH_KEY_PASSWORD: ${{ secrets.PH_KEY_PASSWORD }}
+        run: |
+          # SDL's Java side (SDLActivity etc.), copied in like scripts/5-BUILD-ANDROID.ps1 does
+          mkdir -p android/app/src/main/java/org/libsdl/app
+          cp "$RUNNER_TEMP"/sdl3-src/android-project/app/src/main/java/org/libsdl/app/*.java android/app/src/main/java/org/libsdl/app/
+          chmod +x android/gradlew
+          # Gradle's own downloads first, retried: Maven Central sometimes answers GitHub's runners with 429 Too Many Requests.
+          for try in 1 2 3 4; do
+            android/gradlew --no-daemon -p android help -PphShell -PphCmakeVersion=3.31.6 "-PphSdlSource=$RUNNER_TEMP/sdl3-src" && break
+            [ $try = 4 ] && exit 1
+            echo "::warning::Gradle downloads failed (try $try), retrying in $((try * 60)) s"; sleep $((try * 60))
+          done
+          android/gradlew --no-daemon -p android :app:assembleDebug -PphShell -PphCmakeVersion=3.31.6 \
+            "-PphSdlSource=$RUNNER_TEMP/sdl3-src" $PH_GRADLE_ARGS \
+            "-PphKeystorePassword=$PH_KEYSTORE_PASSWORD" "-PphKeyAlias=$PH_KEY_ALIAS" "-PphKeyPassword=$PH_KEY_PASSWORD"
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -E "\.so$"
+          "$(ls -d "$ANDROID_HOME"/build-tools/* | tail -1)"/apksigner verify --print-certs android/app/build/outputs/apk/debug/app-debug.apk | grep -i "SHA-256" || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PhantomHourglass-android-shell
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+  release:
+    # Only for v* tags: one Release per version, the files attached as they are (no zip), no game data in either.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: art
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir out
+          cp art/PhantomHourglass-windows/PhantomHourglass.exe out/PhantomHourglass.exe
+          cp art/PhantomHourglass-android-shell/app-debug.apk out/PhantomHourglass.apk
+          (cd out && sha256sum PhantomHourglass.exe PhantomHourglass.apk > SHA256SUMS.txt)
+          {
+            echo "You need your own Phantom Hourglass ROM (USA or Europe): the game is built from it on your PC or phone the first time (about a minute). Nothing from the game is included here."
+            echo
+            echo "- Windows: download PhantomHourglass.exe, run it, select your ROM."
+            echo "- Android: install PhantomHourglass.apk, then import your ROM in the app."
+            echo
+            echo "Built from commit ${GITHUB_SHA::7}."
+            echo
+            # Read by the Android app's update check (UpdateCheck.java); invisible on the Release page.
+            echo "<!-- versionCode: ${{ needs.android.outputs.version_code }} -->"
+          } > notes.md
+          # Safe to run again (a re-run, or an upload retried after it had gone through): create once, then overwrite.
+          pre=""; [[ "$GITHUB_REF_NAME" == *-* ]] && pre="--prerelease"
+          gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1 ||
+            gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --title "Phantom Hourglass Recomp $GITHUB_REF_NAME" --notes-file notes.md $pre
+          gh release upload "$GITHUB_REF_NAME" out/* -R "$GITHUB_REPOSITORY" --clobber
