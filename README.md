@@ -4,8 +4,9 @@ A native port of **The Legend of Zelda: Phantom Hourglass** (Nintendo DS) to Win
 ARM9 code is statically recompiled to C and compiled ahead of time instead of emulated; the rest of the DS comes from
 [melonDS](https://github.com/melonDS-emu/melonDS).
 
-> **No game data is included.** You build the game from your own dump. Please don't share the builds you make: the
-> game folder and the APK contain the game.
+> **No game data is included.** The game is built from your own dump, on your own PC or phone. The downloads
+> (`PhantomHourglass.exe`, `PhantomHourglass.apk`) contain only the program. If you build it yourself (below), please
+> don't share what you make: that game folder and APK contain the game.
 
 <p>
   <img src="docs/images/pc-16x9-gpu.jpg" width="100%" alt="PC: a temple room in 16:9 with the GPU renderer at 8x">
@@ -37,6 +38,20 @@ ARM9 code is statically recompiled to C and compiled ahead of time instead of em
 Tested devices and fps measurements: [docs/TESTED.md](docs/TESTED.md).
 
 Ideas and features being considered next: [docs/WISHLIST.md](docs/WISHLIST.md).
+
+## Download and play
+
+No building needed: download the program from the [Releases](../../releases) page and bring your own dump (any one
+from the table below).
+
+- **Windows:** download `PhantomHourglass.exe`, run it and select your ROM. The game is built on your PC from it, once
+  (about a minute); nothing from the game is downloaded.
+- **Android (8+, arm64):** install `PhantomHourglass.apk`, open it, choose your ROM, and the game is built on the phone
+  (about a minute). Later versions install over it and keep your saves.
+
+**D-pad:** with a clean dump the D-pad doesn't move Link yet; turn on **Analog stick** in the menu and move with a
+gamepad's stick (on Android it turns the on-screen D-pad into a stick). With the USA or Europe **D-pad patch** dump, the D-pad works. D-pad movement
+on clean dumps is in progress (Spirit Tracks Recomp already has it).
 
 ## What you need
 
