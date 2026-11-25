@@ -70,9 +70,9 @@ public final class DsPad extends View {
     /* The menu's groups: preference key, label, on by default. */
     static final String[][] GROUPS = {
             {"dpad", "D-pad", "1"},
-            {"face", "A B X Y buttons", "0"},
+            {"face", "A B X Y buttons", "1"},
             {"shoulders", "L and R", "0"},
-            {"startselect", "Start and Select", "0"},
+            {"startselect", "Start and Select", "1"},
             {"mic", "Mic button", "1"},
             {"mic_sample", "Blow sample button", "1"},
             {"lid", "Lid button", "1"},

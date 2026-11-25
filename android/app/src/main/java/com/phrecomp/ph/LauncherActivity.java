@@ -37,7 +37,7 @@ import java.util.Locale;
  * originals are only read. A save is never overwritten without a dated backup next to it.
  */
 public final class LauncherActivity extends Activity {
-    private static final int PICK_ROM = 1, PICK_SAVE = 2, EXPORT_SAVE = 3;
+    private static final int PICK_ROM = 1, PICK_SAVE = 2, EXPORT_SAVE = 3, PICK_MODULE = 4;
     // The dumps the game can be recompiled for (SHA-1): USA and Europe, clean or patched.
     private static final String[] KNOWN = {
             "4c8f52dd719918bbcd46e73a8bae8628139c1b85",
@@ -49,6 +49,45 @@ public final class LauncherActivity extends Activity {
     private static final int SAVE_SIZE = 512 * 1024;  // the cartridge's 4 Mbit flash
 
     private File rom() { return new File(getFilesDir(), "rom/azee.nds"); }
+
+    /** The recompiled game, for a shell APK (BuildConfig.SHELL): frontend main.cpp loads it from here when present. */
+    private File module() { return new File(getFilesDir(), "game/libph_game.so"); }
+
+    private static final String MODULE_HELP = "The game is built on this phone from your ROM: nothing from the game is "
+            + "downloaded. It takes about a minute, once.";
+
+    /** Which app install the game module was built by (lastUpdateTime:versionCode); a newer app rebuilds it. */
+    private File moduleStamp() { return new File(getFilesDir(), "game/built-for.txt"); }
+
+    private String appStamp() {
+        try {
+            return getPackageManager().getPackageInfo(getPackageName(), 0).lastUpdateTime + ":" + BuildConfig.VERSION_CODE;
+        } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+            return "";
+        }
+    }
+
+    private void stampModule() {
+        try (FileOutputStream out = new FileOutputStream(moduleStamp())) {
+            out.write(appStamp().getBytes("UTF-8"));
+        } catch (IOException ignored) {
+            // (no stamp: the module is taken as current)
+        }
+    }
+
+    /** True when the app was updated since the game was built (the new engine needs the game built again). A module
+     *  without a stamp (copied in by the PC scripts, or built before stamps) is taken as current. */
+    private boolean moduleStale() {
+        if (!BuildConfig.SHELL || !module().isFile() || !moduleStamp().isFile()) return false;
+        try (BufferedReader r = new BufferedReader(new FileReader(moduleStamp()))) {
+            final String line = r.readLine();
+            return line == null || !line.trim().equals(appStamp());
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private boolean building;
 
     private File save() { return new File(getFilesDir(), "saves/azee.sav"); }
 
@@ -83,7 +122,9 @@ public final class LauncherActivity extends Activity {
     private static final String TITLE = "The Legend of Zelda\nPhantom Hourglass";
     private static final String SUBTITLE = "Nintendo DS · native Android port";
     private static final String ROM_HELP = "Choose your own dump of Phantom Hourglass (USA or Europe, clean or patched). "
-            + "It must match the region this APK was built for. It is copied into the app's storage; nothing is downloaded. "
+            + (BuildConfig.SHELL ? "The game is then built from it on this phone. "
+                    : "It must match the region this APK was built for. ")
+            + "It is copied into the app's storage; nothing from the game is downloaded. "
             + "A save from melonDS (.sav) can be imported afterwards under Save file.";
     private static final String SAVE_NAME = "PhantomHourglass.sav";
     private static final boolean GPU_DEFAULT = true;   // GameActivity: prefs.getBoolean("gpu", ...)
@@ -103,6 +144,7 @@ public final class LauncherActivity extends Activity {
         super.onResume();
         look.hideSystemBars();
         refresh();
+        UpdateCheck.maybeCheck(this, prefs(), this::refresh);
         if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_RELAUNCH, false)) {
             getIntent().removeExtra(EXTRA_RELAUNCH);
             if (resume("state").isFile()) relaunchWhenGameGone(System.currentTimeMillis() + 4000);
@@ -133,6 +175,19 @@ public final class LauncherActivity extends Activity {
             look.button(column, "Choose game ROM (.nds)…", null, () -> pick(PICK_ROM)).requestFocus();
             return;
         }
+        if (BuildConfig.SHELL && !module().isFile()) {
+            column.addView(look.text("One more step: build the game", 20, Color.WHITE, true));
+            final TextView info = look.text(MODULE_HELP, 15, 0xFFDDDDDD, false);
+            info.setPadding(0, look.dp(8), 0, look.dp(20));
+            column.addView(info);
+            look.button(column, "Build the game", null, () -> buildGame(false)).requestFocus();
+            look.button(column, "Use a game module built on a PC…", "libph_game.so", () -> pick(PICK_MODULE));
+            return;
+        }
+        if (moduleStale() && !building) {
+            // The app was updated: build the game again for the new version first (the ROM is kept; saves stay).
+            column.post(() -> buildGame(true));
+        }
         final View first;
         if (resume("state").isFile()) {
             first = look.button(column, "Continue", "Where you last quit · " + resumeTime(), () ->
@@ -143,6 +198,10 @@ public final class LauncherActivity extends Activity {
             first = look.button(column, "Start game", "From the title screen",
                     () -> startActivity(new Intent(this, GameActivity.class)));
         }
+        final String update = UpdateCheck.available(prefs());
+        if (update != null)
+            look.button(column, "Update to " + update, "A new version is out: download it from GitHub (saves stay)",
+                    () -> UpdateCheck.install(this, prefs()));
         final LinearLayout row = look.row(column);
         look.small(row, "Save file", this::saveFile);
         look.small(row, "Trophies", () -> {
@@ -172,11 +231,15 @@ public final class LauncherActivity extends Activity {
     }
 
     private void gameRom() {
-        look.dialog().setTitle("Game ROM").setMessage("Ready: " + rom().getName() + " ("
+        final AlertDialog.Builder b = look.dialog().setTitle("Game ROM").setMessage("Ready: " + rom().getName() + " ("
                         + (rom().length() >> 20) + " MB)\n\nChoose the ROM again to replace it. Saves and save "
-                        + "states stay.")
+                        + "states stay." + (BuildConfig.SHELL ? "\n\nGame module: " + (module().isFile()
+                        ? (module().length() >> 20) + " MB, " + new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US)
+                        .format(new Date(module().lastModified())) : "none") + "." : ""))
                 .setPositiveButton("Choose ROM…", (d, w) -> pick(PICK_ROM))
-                .setNegativeButton("Back", null).show();
+                .setNegativeButton("Back", null);
+        if (BuildConfig.SHELL) b.setNeutralButton("Rebuild game", (d, w) -> buildGame(false));
+        b.show();
     }
 
     /** When the resume state was written ("MM-DD HH:MM", from resume.txt). */
@@ -214,17 +277,78 @@ public final class LauncherActivity extends Activity {
             String message;
             try {
                 if (request == PICK_ROM) message = importRom(uri);
+                else if (request == PICK_MODULE) message = importModule(uri);
                 else if (request == PICK_SAVE) message = importSave(uri);
                 else message = exportSave(uri);
             } catch (IOException e) {
                 message = "That did not work: " + e.getMessage();
             }
             final String m = message;
+            final boolean build = BuildConfig.SHELL && request == PICK_ROM && m.startsWith("Game ROM ready");
             runOnUiThread(() -> {
                 refresh();
-                new AlertDialog.Builder(this).setMessage(m).setPositiveButton("OK", null).show();
+                if (build) buildGame(false);  // (a new ROM needs its own game)
+                else new AlertDialog.Builder(this).setMessage(m).setPositiveButton("OK", null).show();
             });
         }).start();
+    }
+
+    /** Shell APK: builds files/game/libph_game.so from the ROM on the phone (GameBuilder), with a progress dialog. */
+    private void buildGame(boolean afterUpdate) {
+        if (building) return;
+        building = true;
+        final AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(afterUpdate ? "App updated: building the game again" : "Building the game")
+                .setMessage("Recompiling your ROM…").setCancelable(false).show();
+        final long start = System.currentTimeMillis();
+        final Runnable tick = new Runnable() {
+            @Override
+            public void run() {
+                if (!dialog.isShowing()) return;
+                final int p = GameBuilder.progress();
+                dialog.setMessage((p < 20 ? "Recompiling your ROM…" : "Compiling the game…") + " " + p + "%");
+                getWindow().getDecorView().postDelayed(this, 300);
+            }
+        };
+        new Thread(() -> {
+            //noinspection ResultOfMethodCallIgnored
+            module().delete();
+            runOnUiThread(tick);
+            final String error = GameBuilder.run(this, rom(), module());
+            if (error == null) stampModule();
+            final long secs = (System.currentTimeMillis() - start) / 1000;
+            runOnUiThread(() -> {
+                building = false;
+                dialog.dismiss();
+                refresh();
+                new AlertDialog.Builder(this).setMessage(error == null
+                                ? "The game is ready (built in " + secs + " s). Press Start game." : error)
+                        .setPositiveButton("OK", null).show();
+            });
+        }).start();
+    }
+
+    /** A shell APK's game: an arm64 ELF shared library. Which ROM it was built from is checked when the game starts. */
+    private String importModule(Uri uri) throws IOException {
+        final File dest = module(), tmp = new File(dest.getPath() + ".tmp");
+        //noinspection ResultOfMethodCallIgnored
+        dest.getParentFile().mkdirs();
+        copy(uri, tmp);
+        final byte[] h = new byte[20];
+        try (InputStream in = new FileInputStream(tmp)) {
+            if (in.read(h) != h.length) h[0] = 0;
+        }
+        // ELF magic, 64-bit (EI_CLASS 2), little-endian, shared object (e_type 3), AArch64 (e_machine 183).
+        if (!(h[0] == 0x7f && h[1] == 'E' && h[2] == 'L' && h[3] == 'F' && h[4] == 2 && h[5] == 1 && h[16] == 3
+                && (h[18] & 0xff) == 183 && h[19] == 0)) {
+            //noinspection ResultOfMethodCallIgnored
+            tmp.delete();
+            return "That file is not a game module: choose the libph_game.so the PC build made for Android (arm64).";
+        }
+        if (dest.exists() && !dest.delete()) throw new IOException("cannot replace the game module");
+        if (!tmp.renameTo(dest)) throw new IOException("cannot store the game module");
+        stampModule();
+        return "Game module ready (" + (dest.length() >> 20) + " MB). Press Start game.";
     }
 
     private String importRom(Uri uri) throws IOException {
