@@ -1,3 +1,4 @@
+
 # Builds PhantomHourglass.exe the way a player downloads it: the program only (recompiler + TinyCC + its build files
 # inside), no ROM and no game. On first run it asks for the player's own ROM and builds the game itself.
 name: Windows exe + Android shell APK
@@ -25,16 +26,26 @@ jobs:
           echo "$(cygpath -w "$(ls -d "$RUNNER_TEMP"/llvm-mingw-*-ucrt-x86_64 | head -1)")\\bin" >> "$GITHUB_PATH"
       - name: Configure
         run: |
+          # -static: bake libc++ and libunwind into the exe so players don't need libc++.dll / libunwind.dll.
           cmake -S . -B build/ci -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_RC_COMPILER=windres \
-            "-DCMAKE_CXX_FLAGS=-include algorithm" -DFFCC_BUILD_TESTS=OFF
+            "-DCMAKE_CXX_FLAGS=-include algorithm" \
+            "-DCMAKE_EXE_LINKER_FLAGS=-static" \
+            -DFFCC_BUILD_TESTS=OFF
       - name: Build
         run: cmake --build build/ci --target PhantomHourglass -j 4
       - name: Package
         run: |
           mkdir -p out/PhantomHourglass
           cp build/ci/frontend/PhantomHourglass.exe LICENSE NOTICE.md out/PhantomHourglass/
-          llvm-objdump -p out/PhantomHourglass/PhantomHourglass.exe | grep "DLL Name" | sort -u
+          # List the DLLs the exe imports, and fail if any compiler runtime DLL is still among them
+          # (players' PCs don't have llvm-mingw, so the exe would not start for them).
+          imports=$(llvm-objdump -p out/PhantomHourglass/PhantomHourglass.exe | grep "DLL Name" | sort -u || true)
+          echo "$imports"
+          if echo "$imports" | grep -Eiq 'libc\+\+|libunwind|libgcc|libwinpthread'; then
+            echo "::error::PhantomHourglass.exe still dynamically imports compiler runtime DLLs"
+            exit 1
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: PhantomHourglass-windows
