@@ -76,6 +76,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+          cache: gradle  # (Gradle's downloads kept between runs: fewer requests to Maven Central)
       - name: NDK + CMake
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
@@ -92,6 +93,12 @@ jobs:
           mkdir -p android/app/src/main/java/org/libsdl/app
           cp "$RUNNER_TEMP"/sdl3-src/android-project/app/src/main/java/org/libsdl/app/*.java android/app/src/main/java/org/libsdl/app/
           chmod +x android/gradlew
+          # Gradle's own downloads first, retried: Maven Central sometimes answers GitHub's runners with 429 Too Many Requests.
+          for try in 1 2 3 4; do
+            android/gradlew --no-daemon -p android help -PphShell -PphCmakeVersion=3.31.6 "-PphSdlSource=$RUNNER_TEMP/sdl3-src" && break
+            [ $try = 4 ] && exit 1
+            echo "::warning::Gradle downloads failed (try $try), retrying in $((try * 60)) s"; sleep $((try * 60))
+          done
           android/gradlew --no-daemon -p android :app:assembleDebug -PphShell -PphCmakeVersion=3.31.6 \
             "-PphSdlSource=$RUNNER_TEMP/sdl3-src" $PH_GRADLE_ARGS \
             "-PphKeystorePassword=$PH_KEYSTORE_PASSWORD" "-PphKeyAlias=$PH_KEY_ALIAS" "-PphKeyPassword=$PH_KEY_PASSWORD"
