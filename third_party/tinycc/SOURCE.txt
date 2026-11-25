@@ -1,0 +1,2 @@
+repo.or.cz/tinycc.git mob e9e9e7f (2026-11-23); config.h generated: configure --cpu=aarch64 --targetos=Android, CONFIG_TCC_PREDEFS 0
+VERSION 0.9.28rc (file removed: it shadowed C++'s <version> on Windows)

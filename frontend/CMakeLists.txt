@@ -13,6 +13,20 @@ set(PH_CONFIG ${CMAKE_CURRENT_SOURCE_DIR}/config/${PH_CONFIG_CODE})
 if(PH_ROM)
   message(STATUS "Phantom Hourglass config: ${PH_CONFIG_CODE} (${PH_CONFIG})")
 endif()
+# The version and commit the program shows (menu header, window title): "v0.1.0 (abc1234)", "-dirty" with local changes.
+execute_process(COMMAND git rev-parse --short=7 HEAD WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+                OUTPUT_VARIABLE PH_GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+execute_process(COMMAND git status --porcelain --untracked-files=no WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+                OUTPUT_VARIABLE PH_GIT_DIRTY OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+if(NOT PH_GIT_COMMIT)
+  set(PH_GIT_COMMIT "unknown")
+elseif(PH_GIT_DIRTY)
+  string(APPEND PH_GIT_COMMIT "-dirty")
+endif()
+set(PH_BUILD_LABEL "v${PROJECT_VERSION} (${PH_GIT_COMMIT})")
+if(EXISTS ${CMAKE_SOURCE_DIR}/.git)
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/.git)
+endif()
 
 # Embedded HD font (Inter Bold, SIL OFL 1.1) for optional vector text rendering.
 set(PH_HD_FONT_SRC ${CMAKE_CURRENT_BINARY_DIR}/hd_font_data.cpp)
@@ -29,16 +43,27 @@ add_custom_command(
 # ---- Android: the game's C comes from a PC build (recomp_generated), compiled here for the phone ----
 if(ANDROID)
   set(PH_GENERATED_DIR "" CACHE PATH "The recomp_generated folder of a PC build (2-BUILD.ps1)")
-  if(NOT EXISTS "${PH_GENERATED_DIR}/func_table.c")
+  if(PH_SHELL)
+    # The shell APK: no game inside. libphbuild = the recompiler + TinyCC (LGPL, kept in its own library), which build
+    # files/game/libph_game.so on the phone from the player's ROM (android_build.cpp).
+    set(TCC_DIR ${CMAKE_SOURCE_DIR}/third_party/tinycc)
+    add_library(phbuild SHARED src/android_build.cpp src/game_builder.cpp ${TCC_DIR}/libtcc.c)
+    set_source_files_properties(${TCC_DIR}/libtcc.c PROPERTIES COMPILE_OPTIONS "-w" COMPILE_DEFINITIONS "ONE_SOURCE=1")
+    target_include_directories(phbuild PRIVATE ${TCC_DIR}/config/android ${TCC_DIR})
+    target_compile_options(phbuild PRIVATE -O2)
+    target_link_libraries(phbuild PRIVATE ntr_recomp ntr_common log)
+  elseif(NOT EXISTS "${PH_GENERATED_DIR}/func_table.c")
     message(FATAL_ERROR "PH_GENERATED_DIR must be a PC build's recomp_generated folder (run 2-BUILD.ps1 first)")
   endif()
-  file(GLOB PH_GEN_SHARDS CONFIGURE_DEPENDS "${PH_GENERATED_DIR}/funcs_*.c")
-  add_library(ph_game SHARED ${PH_GENERATED_DIR}/func_table.c ${PH_GEN_SHARDS})
-  target_include_directories(ph_game PRIVATE ${PH_GENERATED_DIR} ${CMAKE_SOURCE_DIR}/runtime/include)
-  target_compile_definitions(ph_game PRIVATE NTR_GAME_MODULE=1)
-  set_target_properties(ph_game PROPERTIES C_VISIBILITY_PRESET hidden)
-  target_compile_options(ph_game PRIVATE -w -ffreestanding -fno-stack-protector -O2)
-  target_link_options(ph_game PRIVATE -nostdlib)
+  if(NOT PH_SHELL)
+    file(GLOB PH_GEN_SHARDS CONFIGURE_DEPENDS "${PH_GENERATED_DIR}/funcs_*.c")
+    add_library(ph_game SHARED ${PH_GENERATED_DIR}/func_table.c ${PH_GEN_SHARDS})
+    target_include_directories(ph_game PRIVATE ${PH_GENERATED_DIR} ${CMAKE_SOURCE_DIR}/runtime/include)
+    target_compile_definitions(ph_game PRIVATE NTR_GAME_MODULE=1)
+    set_target_properties(ph_game PROPERTIES C_VISIBILITY_PRESET hidden)
+    target_compile_options(ph_game PRIVATE -w -ffreestanding -fno-stack-protector -O2)
+    target_link_options(ph_game PRIVATE -nostdlib)
+  endif()
 
   # SDL's Android activity loads the program as libmain.so and calls its SDL_main.
   add_library(main SHARED src/main.cpp src/game_module.cpp src/ph_hooks.cpp src/ph_stick.cpp src/ph_temple.cpp src/ph_text.cpp
@@ -48,7 +73,9 @@ if(ANDROID)
   target_compile_options(main PRIVATE -O2)
   target_link_libraries(main PRIVATE ntr_runtime ntr_common SDL3::SDL3-static android log
                         "$<LINK_GROUP:RESCAN,ntr_runtime,melonds_core>")
-  add_dependencies(main ph_game)
+  if(NOT PH_SHELL)
+    add_dependencies(main ph_game)
+  endif()
   return()
 endif()
 
@@ -105,12 +132,42 @@ endif()
 # ---- the program ----
 add_executable(PhantomHourglass src/main.cpp src/game_module.cpp src/ph_hooks.cpp src/ph_stick.cpp src/ph_temple.cpp src/ph_text.cpp
                ${PH_HD_FONT_SRC} src/png.cpp src/gl_present.cpp src/menu.cpp src/achievements.cpp)
+target_compile_definitions(PhantomHourglass PRIVATE "PH_BUILD_LABEL=\"${PH_BUILD_LABEL}\"")
 target_include_directories(PhantomHourglass PRIVATE src ${CMAKE_SOURCE_DIR}/third_party/stb)
 set_target_properties(PhantomHourglass PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 if(PH_ROM)
   add_dependencies(PhantomHourglass ph_game)  # (built together, next to the program)
 endif()
 target_link_libraries(PhantomHourglass PRIVATE ntr_runtime ntr_common SDL3::SDL3-static)
+
+# ---- first-run setup: the program builds ph_game from the player's ROM itself (game_builder.cpp: the recompiler +
+# TinyCC, LGPL), into the data folder. Its headers and the recompiler configs (both releases) are packed into the
+# program. ----
+if(WIN32)
+  set(TCC_DIR ${CMAKE_SOURCE_DIR}/third_party/tinycc)
+  target_sources(PhantomHourglass PRIVATE src/game_builder.cpp src/win_pick.cpp ${TCC_DIR}/libtcc.c)
+  target_link_libraries(PhantomHourglass PRIVATE comdlg32)
+  set_source_files_properties(${TCC_DIR}/libtcc.c PROPERTIES COMPILE_OPTIONS "-w" COMPILE_DEFINITIONS "ONE_SOURCE=1")
+  set_source_files_properties(src/game_builder.cpp PROPERTIES INCLUDE_DIRECTORIES "${TCC_DIR}")
+  target_include_directories(PhantomHourglass PRIVATE ${TCC_DIR}/config/windows)
+  target_link_libraries(PhantomHourglass PRIVATE ntr_recomp)
+  target_compile_definitions(PhantomHourglass PRIVATE PH_PC_SETUP=1)
+  # The compiler's support files are packed into the exe (unpacked to the data folder only while building).
+  set(PH_TOOLCHAIN_CPP ${CMAKE_CURRENT_BINARY_DIR}/embedded_toolchain_data.cpp)
+  set(PH_CONFIG_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/config)
+  file(GLOB_RECURSE PH_TOOLCHAIN_INPUTS CONFIGURE_DEPENDS ${TCC_DIR}/include/* ${TCC_DIR}/win32/lib/*
+       ${CMAKE_SOURCE_DIR}/runtime/include/* ${PH_CONFIG_ROOT}/*)
+  add_custom_command(OUTPUT ${PH_TOOLCHAIN_CPP}
+    COMMAND ${CMAKE_COMMAND} -DOUT=${PH_TOOLCHAIN_CPP} -DTCC=${TCC_DIR} -DONDEVICE=${CMAKE_SOURCE_DIR}/tools/ondevice
+            -DRT=${CMAKE_SOURCE_DIR}/runtime/include -DCFG=${PH_CONFIG_ROOT}
+            -P ${CMAKE_SOURCE_DIR}/tools/embed_toolchain.cmake
+    DEPENDS ${CMAKE_SOURCE_DIR}/tools/embed_toolchain.cmake ${PH_TOOLCHAIN_INPUTS}
+            ${CMAKE_SOURCE_DIR}/tools/ondevice/stdint.h ${CMAKE_SOURCE_DIR}/tools/ondevice/string.h
+            ${CMAKE_SOURCE_DIR}/tools/ondevice/dllstart.c
+    VERBATIM)
+  target_sources(PhantomHourglass PRIVATE src/embedded_toolchain.cpp ${PH_TOOLCHAIN_CPP})
+  set_source_files_properties(${PH_TOOLCHAIN_CPP} PROPERTIES INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/src)
+endif()
 if(PH_GLES_SHADERS)  # (the gles-test preset: the phone's renderer, its ES shaders and gles_compat, on the PC)
   target_sources(PhantomHourglass PRIVATE src/gles_compat.cpp)
   target_compile_definitions(PhantomHourglass PRIVATE PH_GLES_TEST=1)
