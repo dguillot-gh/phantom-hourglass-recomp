@@ -147,7 +147,9 @@ public final class LauncherActivity extends Activity {
             final int n = getIntent().getIntExtra("bench_frames", 0);
             final boolean cont = getIntent().getBooleanExtra("bench_continue", false);
             getIntent().removeExtra("bench_frames");
-            startActivity(new Intent(this, GameActivity.class).putExtra("unpaced", true).putExtra("exit_after", n)
+            // (--ez bench_paced true: at the DS's 60 fps like normal play, to see whether it holds and at what CPU cost)
+            final boolean paced = getIntent().getBooleanExtra("bench_paced", false);
+            startActivity(new Intent(this, GameActivity.class).putExtra("unpaced", !paced).putExtra("exit_after", n)
                     .putExtra(GameActivity.EXTRA_CONTINUE, cont));
         }
         if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_RELAUNCH, false)) {

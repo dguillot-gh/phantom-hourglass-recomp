@@ -1422,7 +1422,8 @@ int main(int argc, char** argv) {
     shared.achievements.load(data_dir / "saves" / "achievements.txt", read_only_save || testing);
     ph::pad::achievements.store(&shared.achievements);
     Host host(shared, window, audio, std::move(script), exit_after, unpaced);
-    host.set_resume(continue_arg && !testing, !testing);
+    // (a benchmark, --exit-after-frames without a script, may start from the resume state: --continue)
+    host.set_resume(continue_arg && script_path.empty(), !testing);
 #ifdef __ANDROID__
     const bool lifecycle_watch_registered = SDL_AddEventWatch(watch_android_lifecycle, &shared);
     if (!lifecycle_watch_registered) std::fprintf(stderr, "android: could not register SDL lifecycle event watch: %s\n", SDL_GetError());
