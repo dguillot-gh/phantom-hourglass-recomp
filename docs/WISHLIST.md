@@ -79,3 +79,32 @@ status or caution note; nothing here is promised.
   the tests, and the recompiler can be run on a small synthetic test image.*
 - **A debug tab in the menu.** Current room, Link's coordinates, active flags and the loaded overlays, live, to speed up
   finding addresses (European releases, new hooks). *Note: the menu is the port's own drawing code (not ImGui).*
+
+## 6. Performance (from the phone profile, 2026-11-25)
+
+Measured on a Moto G Stylus 2025 (60 Hz) and a Pixel 8 (120 Hz), both games, clang and TinyCC game modules, four
+renderers: [the report](https://github.com/dguillot-gh/phantom-hourglass-recomp/blob/main/docs/PROFILE-2026-11-25.md)
+(in the Phantom Hourglass repository). The game build with clang (v0.2.0) already cut the game's own code from 20-31%
+of the CPU to 5-11%; what is left, most visible gain first:
+
+- **Ask Android for 60 fps, not 120.** The game's surface votes for 120 fps (`dumpsys SurfaceFlinger --timestats`:
+  `frameRate = 120.00`) while the game makes 60, so on 120 Hz phones frames land 16.7 or 25 ms apart: 12-16% late
+  frames on the Pixel 8 even with clang, at a 61.7 fps average. Setting the surface's frame rate to 60 with fixed-source
+  compatibility (`Surface.setFrameRate` / `ANativeWindow_setFrameRate`, Android 11+) should show every frame for
+  exactly two refreshes. *Check: the present-to-present histogram in timestats before and after.*
+- **Renderer default by phone.** The Moto cannot hold 60 fps in Phantom Hourglass with the Compute renderer (47 fps at
+  2x, 36 at 4x, with either compiler); OpenGL 2x gives ~56, Software 1x 60. Start such phones on OpenGL, or drop to
+  OpenGL when the game misses 60 for a few seconds. *Check first that the GPU, not the CPU, is the limit there (GPU
+  load at Compute 2x).*
+- **The ARM7 interpreter.** melonDS interprets the DS's second CPU (sound, touch, timers) one instruction at a time,
+  with its bus reads and cycle counting: 22-31% of the app's CPU, now the biggest single cost. Options: melonDS's ARM
+  JIT for the ARM7 on arm64 (if it builds for Android), skipping the ARM7's idle loops, or cheaper ARM7 timing.
+  *Caution: the ARM7 runs the sound and the touch screen; check audio and touch after any change.*
+- **Phantom Hourglass's extra Android work.** PH spends 6-12% of the app's CPU in `SDLThread` and binder threads,
+  against 3-6% for Spirit Tracks. Find what its Java side does every frame (on-screen pad, FPS badge, vibration,
+  sensors) with a call-graph profile (`simpleperf record -g`).
+- **Runtime function lookups.** `ntr::RuntimeImpl::lookup` and `advance` take ~5%; caching each indirect call's
+  target (or calling known targets directly) would cut most of it.
+- **Allocations every frame.** memcpy and malloc/free take 5-7%; find the callers with `-g` and reuse buffers.
+- **Measure again, properly.** Three runs per cell with the order alternated, both games paced at 60 (Spirit Tracks's
+  test app needs `bench_paced`), and a moving scene (an input script or busier save spots), not only standing still.
