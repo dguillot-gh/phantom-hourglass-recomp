@@ -32,6 +32,18 @@
   `phoneperf` tool). Earlier the same day `phoneperf` measured 59.8 fps at OpenGL 4x on the V30 with a test build
   (`feature/opengl`: the same fixes plus measuring code and an ARM7 timing change that is not on `main`); the gap to the
   45 here is not explained yet (different build, and a different way of counting frames).
+- **On-device compiler** (2026-11-25, test build `fastcc-1`): the game is now built on the phone with clang -O2 + lld
+  (Termux's arm64 LLVM inside the APK), TinyCC only as the fallback. USA D-pad ROM, 65 files / 76 MB of C, 5
+  compiles at once, from tapping "Build the game" to the game ready:
+
+  | Phone | Recompile (ROM to C) | clang -O2 compile | Link (lld) | Total | Module |
+  |---|---:|---:|---:|---:|---:|
+  | Moto G Stylus 2025 | 2.4 s | 380 s | 0.3 s | **383 s** (6 min 23 s) | 42 MB |
+  | Pixel 8 | 1.6 s | 362 s | 0.4 s | **365 s** (6 min 5 s) | 42 MB |
+
+  The game started from the clang module on both. TinyCC builds the game in about 10 s (Spirit Tracks: 10.3 s on
+  the Moto G). No fps A/B for Phantom Hourglass yet; Spirit Tracks measured the same steady-state fps with both
+  compilers (within ~3%), only the first run of a series was slower with TinyCC.
 - **Known issue:** in **Software** mode the bottom of the screen flickers on both phones (seen 2026-11-03 during the
   measurements above); OpenGL and Compute are not affected. Not yet investigated.
 - **OpenGL on phones** (2026-11-03): OpenGL is a menu choice next to Software and Compute. Fixed on the way:
