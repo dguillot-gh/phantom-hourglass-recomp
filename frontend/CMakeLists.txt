@@ -167,6 +167,27 @@ if(WIN32)
     VERBATIM)
   target_sources(PhantomHourglass PRIVATE src/embedded_toolchain.cpp ${PH_TOOLCHAIN_CPP})
   set_source_files_properties(${PH_TOOLCHAIN_CPP} PROPERTIES INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/src)
+  # The optimised build (pc_optimizer.cpp): clang + lld packed into the exe too. PH_PC_CLANG_DIR: a folder with
+  # clang.exe, ld.lld.exe, their DLLs, libmsvcrt.a, dllstart.c and chkstk_ms.S (CI: windows-exe.yml).
+  set(PH_DATA_NAME "" CACHE STRING "PC data folder name under %APPDATA%\\PH-Recomp (empty: PhantomHourglass; test builds: their own)")
+  if(PH_DATA_NAME)
+    target_compile_definitions(PhantomHourglass PRIVATE "PH_DATA_NAME=\"${PH_DATA_NAME}\"")
+  endif()
+  set(PH_PC_CLANG_DIR "" CACHE PATH "Folder with the clang + lld to pack into the exe for the optimised game build")
+  if(PH_PC_CLANG_DIR)
+    enable_language(ASM)
+    set(PH_CLANG_OUT ${CMAKE_CURRENT_BINARY_DIR}/clang_pack)
+    file(MAKE_DIRECTORY ${PH_CLANG_OUT})
+    file(GLOB PH_CLANG_INPUTS CONFIGURE_DEPENDS ${PH_PC_CLANG_DIR}/*)
+    add_custom_command(OUTPUT ${PH_CLANG_OUT}/clang_pack_index.cpp ${PH_CLANG_OUT}/clang_pack.S ${PH_CLANG_OUT}/clang_pack.bin
+      COMMAND ${CMAKE_COMMAND} -DDIR=${PH_PC_CLANG_DIR} -DOUT=${PH_CLANG_OUT} -P ${CMAKE_SOURCE_DIR}/tools/embed_clang.cmake
+      DEPENDS ${CMAKE_SOURCE_DIR}/tools/embed_clang.cmake ${PH_CLANG_INPUTS}
+      VERBATIM)
+    set_source_files_properties(${PH_CLANG_OUT}/clang_pack.S PROPERTIES OBJECT_DEPENDS ${PH_CLANG_OUT}/clang_pack.bin)
+    set_source_files_properties(${PH_CLANG_OUT}/clang_pack_index.cpp PROPERTIES INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_sources(PhantomHourglass PRIVATE src/pc_optimizer.cpp ${PH_CLANG_OUT}/clang_pack_index.cpp ${PH_CLANG_OUT}/clang_pack.S)
+    target_compile_definitions(PhantomHourglass PRIVATE PH_PC_CLANG=1)
+  endif()
 endif()
 if(PH_GLES_SHADERS)  # (the gles-test preset: the phone's renderer, its ES shaders and gles_compat, on the PC)
   target_sources(PhantomHourglass PRIVATE src/gles_compat.cpp)

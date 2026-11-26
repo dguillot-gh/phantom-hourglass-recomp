@@ -16,8 +16,10 @@ static std::string str(JNIEnv* env, jstring s) {
 }
 
 extern "C" JNIEXPORT jstring JNICALL Java_com_phrecomp_ph_GameBuilder_build(JNIEnv* env, jclass, jstring rom,
-                                                                           jstring assets, jstring out, jstring work) {
-    const std::string err = ph::build_game(str(env, rom), str(env, assets), str(env, out), str(env, work), g_progress);
+                                                                           jstring assets, jstring out, jstring work,
+                                                                           jstring keep_c, jboolean compile) {
+    const std::string err = ph::build_game(str(env, rom), str(env, assets), str(env, out), str(env, work), g_progress,
+                                           keep_c ? str(env, keep_c) : std::string(), compile != JNI_FALSE);
     return err.empty() ? nullptr : env->NewStringUTF(err.c_str());
 }
 

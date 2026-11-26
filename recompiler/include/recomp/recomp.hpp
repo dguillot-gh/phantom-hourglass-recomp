@@ -154,6 +154,10 @@ std::optional<int> static_target_module(const Program& program, int from_module,
 struct EmitOptions {
     // Fixed shard count so build systems know the output file names (funcs_000.c .. funcs_NNN.c) in advance.
     size_t shards = 64;
+    // Functions (by C name, e.g. fn_main_02000078) that go to files of their own, hot_000.c .. hot_NNN.c, so the
+    // on-device build can compile just them again with an optimising compiler (config/hot.txt). Empty: none.
+    std::set<std::string> hot;
+    size_t hot_shards = 8;
 };
 
 struct EmitStats {

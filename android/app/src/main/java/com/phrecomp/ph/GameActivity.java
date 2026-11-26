@@ -49,6 +49,13 @@ public class GameActivity extends SDLActivity {
                 "--scale", String.valueOf(hardware ? Math.min(4, prefs.getInt("scale", 2)) : 1)));
         if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_CONTINUE, false)) args.add("--continue");
         if (getIntent() != null && getIntent().getBooleanExtra("fps_probe", false)) args.add("--fps-probe");
+        // Benchmark (adb: am start ... --ez unpaced true --ei exit_after 1320): as fast as it goes, then quit; the
+        // log says how long the frames took ("bench:").
+        if (getIntent() != null && getIntent().getBooleanExtra("unpaced", false)) args.add("--unpaced");
+        if (getIntent() != null && getIntent().getIntExtra("exit_after", 0) > 0) {
+            args.add("--exit-after-frames");
+            args.add(String.valueOf(getIntent().getIntExtra("exit_after", 0)));
+        }
         if (hardware && prefs.getBoolean("wide", false)) args.add("--wide");
         if (hardware && prefs.getInt("wide_mode", 1) == 2) args.add("--wide21");
         final String[] textures = {"pixels", "smooth", "sharp"};
