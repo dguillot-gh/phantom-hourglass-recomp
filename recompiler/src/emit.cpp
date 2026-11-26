@@ -769,19 +769,26 @@ EmitStats emit_c(const Program& program, const Analysis& analysis, const std::fi
         instead_hook_names = instead_hooks;
     }
 
-    const size_t per_shard = (order.size() + options.shards - 1) / options.shards;
-    for (size_t shard = 0; shard < options.shards; shard++) {
-        char name[32];
-        std::snprintf(name, sizeof name, "funcs_%03zu.c", shard);
-        std::ofstream f(out_dir / name, std::ios::binary);
-        f << banner << "#include \"funcs.h\"\n\n";
-        for (size_t j = shard * per_shard; j < std::min(order.size(), (shard + 1) * per_shard); j++) {
-            FunctionEmitter e(program, analysis, *order[j]);
-            f << e.run(stats.instructions);
-            stats.functions++;
+    // The hot functions (options.hot) in hot_*.c, the rest in funcs_*.c; each list keeps the module/address order.
+    std::vector<const Function*> cold, hot;
+    for (const Function* f : order) (options.hot.count(f->c_name()) ? hot : cold).push_back(f);
+    const auto write_shards = [&](const std::vector<const Function*>& list, size_t shards, const char* pattern) {
+        const size_t per_shard = (list.size() + shards - 1) / shards;
+        for (size_t shard = 0; shard < shards; shard++) {
+            char name[32];
+            std::snprintf(name, sizeof name, pattern, shard);
+            std::ofstream f(out_dir / name, std::ios::binary);
+            f << banner << "#include \"funcs.h\"\n\n";
+            for (size_t j = shard * per_shard; j < std::min(list.size(), (shard + 1) * per_shard); j++) {
+                FunctionEmitter e(program, analysis, *list[j]);
+                f << e.run(stats.instructions);
+                stats.functions++;
+            }
+            stats.files++;
         }
-        stats.files++;
-    }
+    };
+    write_shards(cold, options.shards, "funcs_%03zu.c");
+    if (!hot.empty()) write_shards(hot, std::min(options.hot_shards, hot.size()), "hot_%03zu.c");
 
     {
         std::ofstream t(out_dir / "func_table.c", std::ios::binary);

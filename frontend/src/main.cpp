@@ -52,6 +52,13 @@
 #include "pad_input.hpp"
 #include "ph_stick.hpp"
 #include "perf_hint.hpp"
+#ifdef PH_PC_CLANG
+#include "pc_optimizer.hpp"
+#endif
+// The PC data folder's name (%APPDATA%\PH-Recomp\<name>): test builds get their own (-DPH_DATA_NAME=...).
+#ifndef PH_DATA_NAME
+#define PH_DATA_NAME "PhantomHourglass"
+#endif
 #include "ph_hooks.hpp"
 #include "ph_temple.hpp"
 #include "ph_text.hpp"
@@ -560,6 +567,13 @@ public:
         else
             rt_->release_touch();
 
+        // Benchmark (--unpaced --exit-after-frames N, e.g. with --continue): the time from frame 120 (the resume
+        // state has loaded) to the last frame, in the log.
+        if (exit_after_ && f == 120) bench_start_ns_ = SDL_GetTicksNS();
+        if (exit_after_ && f >= exit_after_ && bench_start_ns_ && f > 120) {
+            const double s = double(SDL_GetTicksNS() - bench_start_ns_) / 1e9;
+            SDL_Log("bench: %llu frames in %.3f s = %.1f fps", (unsigned long long)(f - 120), s, double(f - 120) / s);
+        }
         if (quit || (exit_after_ && f >= exit_after_)) return false;
         if (s_.paused.load() && resume_ && !s_.resume_done.load()) {
             // Android, going to the background (where the app may be killed): first the resume state, a frame or
@@ -912,6 +926,7 @@ private:
     SDL_AudioStream* audio_;
     std::vector<ScriptStep> script_;
     uint64_t exit_after_;
+    uint64_t bench_start_ns_ = 0;
     bool unpaced_;
     ntr::Runtime* rt_ = nullptr;
     ntr::Frame last_{};  // (a copy: the runtime's goes when on_frame returns)
@@ -1145,15 +1160,41 @@ bool first_run_setup(const fs::path& data_dir, fs::path& rom_path, const fs::pat
     SDL_Window* window = SDL_CreateWindow(kTitle, 520, 120, 0);
     SDL_Renderer* renderer = window ? SDL_CreateRenderer(window, nullptr) : nullptr;
     std::atomic<int> progress{0};
-    std::atomic<bool> finished{false};
+    std::atomic<bool> finished{false}, clang_phase{false};
     std::string error;
     std::thread worker([&] {
         const auto u8 = [](const fs::path& p) { const auto s = p.u8string(); return std::string(s.begin(), s.end()); };
         // The compiler's files travel inside the exe: unpack them next to the work folder, remove them afterwards.
         const fs::path tools = data_dir / "build-tools";
         error = ph::unpack_toolchain(u8(tools));
+#ifdef PH_PC_CLANG
+        // clang first (pc_optimizer.cpp): recompile to C, then clang -O2 compiles it; TinyCC only when that fails.
+        if (error.empty()) {
+            const fs::path opt = ph::pc_opt_dir(data_dir);
+            std::error_code opt_ec;
+            std::atomic<int> step{0};
+            std::string clang_error = ph::build_game(u8(rom_path), u8(tools), u8(module), u8(data_dir / "build-work"),
+                                                     step, u8(opt / "gen"), false);
+            if (clang_error.empty()) {
+                fs::rename(tools / "tcc" / "include", opt / "inc", opt_ec);
+                if (!opt_ec) fs::rename(tools / "rt", opt / "rt", opt_ec);
+                if (opt_ec) clang_error = "cannot keep the compiler's headers: " + opt_ec.message();
+            }
+            if (clang_error.empty()) {
+                clang_phase = true;
+                clang_error = ph::pc_clang_build(data_dir, module, progress);
+            }
+            fs::remove_all(opt, opt_ec);
+            if (!clang_error.empty()) {  // (TinyCC: a working, slower game)
+                std::fprintf(stderr, "setup: clang failed, TinyCC instead: %s\n", clang_error.c_str());
+                clang_phase = false;
+                error = ph::build_game(u8(rom_path), u8(tools), u8(module), u8(data_dir / "build-work"), progress);
+            }
+        }
+#else
         if (error.empty())
             error = ph::build_game(u8(rom_path), u8(tools), u8(module), u8(data_dir / "build-work"), progress);
+#endif
         std::error_code rm_ec;
         fs::remove_all(tools, rm_ec);
         finished = true;
@@ -1164,8 +1205,12 @@ bool first_run_setup(const fs::path& data_dir, fs::path& rom_path, const fs::pat
         while (SDL_PollEvent(&e)) {}  // (closing the window waits for the build: TinyCC can't be stopped midway)
         const int p = progress;
         if (window) {
-            const std::string title = std::string(p < 20 ? "Recompiling your ROM... " : "Building the game... ") +
-                                      std::to_string(p) + "%";
+            const uint64_t s = (SDL_GetTicks() - start) / 1000;
+            char clock[16];
+            std::snprintf(clock, sizeof clock, " (%u:%02u)", unsigned(s / 60), unsigned(s % 60));
+            const std::string title = std::string(clang_phase ? "Compiling the game with clang (best speed, once)... "
+                                                  : p < 20 ? "Recompiling your ROM... " : "Building the game... ") +
+                                      std::to_string(p) + "%" + clock;
             SDL_SetWindowTitle(window, title.c_str());
         }
         if (renderer) {
@@ -1252,7 +1297,7 @@ int main(int argc, char** argv) {
     if (data_dir.empty()) {
         if (fs::exists(base / "portable.txt", ec)) {
             data_dir = base / "data";
-        } else if (char* pref = SDL_GetPrefPath("PH-Recomp", "PhantomHourglass")) {
+        } else if (char* pref = SDL_GetPrefPath("PH-Recomp", PH_DATA_NAME)) {
             data_dir = pref;
             SDL_free(pref);
         }
@@ -1377,7 +1422,8 @@ int main(int argc, char** argv) {
     shared.achievements.load(data_dir / "saves" / "achievements.txt", read_only_save || testing);
     ph::pad::achievements.store(&shared.achievements);
     Host host(shared, window, audio, std::move(script), exit_after, unpaced);
-    host.set_resume(continue_arg && !testing, !testing);
+    // (a benchmark, --exit-after-frames without a script, may start from the resume state: --continue)
+    host.set_resume(continue_arg && script_path.empty(), !testing);
 #ifdef __ANDROID__
     const bool lifecycle_watch_registered = SDL_AddEventWatch(watch_android_lifecycle, &shared);
     if (!lifecycle_watch_registered) std::fprintf(stderr, "android: could not register SDL lifecycle event watch: %s\n", SDL_GetError());

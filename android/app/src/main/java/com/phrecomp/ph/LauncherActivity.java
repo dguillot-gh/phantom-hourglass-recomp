@@ -8,6 +8,7 @@ import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -54,18 +55,12 @@ public final class LauncherActivity extends Activity {
     private File module() { return new File(getFilesDir(), "game/libph_game.so"); }
 
     private static final String MODULE_HELP = "The game is built on this phone from your ROM: nothing from the game is "
-            + "downloaded. It takes about a minute, once.";
+            + "downloaded. It takes a few minutes, once.";
 
     /** Which app install the game module was built by (lastUpdateTime:versionCode); a newer app rebuilds it. */
     private File moduleStamp() { return new File(getFilesDir(), "game/built-for.txt"); }
 
-    private String appStamp() {
-        try {
-            return getPackageManager().getPackageInfo(getPackageName(), 0).lastUpdateTime + ":" + BuildConfig.VERSION_CODE;
-        } catch (android.content.pm.PackageManager.NameNotFoundException e) {
-            return "";
-        }
-    }
+    private String appStamp() { return GameBuilder.appStamp(this); }
 
     private void stampModule() {
         try (FileOutputStream out = new FileOutputStream(moduleStamp())) {
@@ -145,6 +140,18 @@ public final class LauncherActivity extends Activity {
         look.hideSystemBars();
         refresh();
         UpdateCheck.maybeCheck(this, prefs(), this::refresh);
+        if (BuildConfig.SHELL && !building && OptimizeService.running()) buildGame(false);  // (the build goes on)
+        // Benchmark from adb (the game activity is not exported): am start -n <pkg>/com.phrecomp.ph.LauncherActivity
+        //   --ei bench_frames 1320 [--ez bench_continue true]  ->  the game unpaced, quits after N frames, log "bench:".
+        if (getIntent() != null && getIntent().getIntExtra("bench_frames", 0) > 0) {
+            final int n = getIntent().getIntExtra("bench_frames", 0);
+            final boolean cont = getIntent().getBooleanExtra("bench_continue", false);
+            getIntent().removeExtra("bench_frames");
+            // (--ez bench_paced true: at the DS's 60 fps like normal play, to see whether it holds and at what CPU cost)
+            final boolean paced = getIntent().getBooleanExtra("bench_paced", false);
+            startActivity(new Intent(this, GameActivity.class).putExtra("unpaced", !paced).putExtra("exit_after", n)
+                    .putExtra(GameActivity.EXTRA_CONTINUE, cont));
+        }
         if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_RELAUNCH, false)) {
             getIntent().removeExtra(EXTRA_RELAUNCH);
             if (resume("state").isFile()) relaunchWhenGameGone(System.currentTimeMillis() + 4000);
@@ -235,11 +242,26 @@ public final class LauncherActivity extends Activity {
                         + (rom().length() >> 20) + " MB)\n\nChoose the ROM again to replace it. Saves and save "
                         + "states stay." + (BuildConfig.SHELL ? "\n\nGame module: " + (module().isFile()
                         ? (module().length() >> 20) + " MB, " + new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US)
-                        .format(new Date(module().lastModified())) : "none") + "." : ""))
+                        .format(new Date(module().lastModified())) : "none") + "." + optimisedText() : ""))
                 .setPositiveButton("Choose ROM…", (d, w) -> pick(PICK_ROM))
                 .setNegativeButton("Back", null);
         if (BuildConfig.SHELL) b.setNeutralButton("Rebuild game", (d, w) -> buildGame(false));
         b.show();
+    }
+
+    /** How the game was built, for the Game ROM dialog (GameOptimizer writes game/optimised.txt). */
+    private String optimisedText() {
+        if (!GameOptimizer.available(this)) return "";
+        if (OptimizeService.running()) return "\n\nBuilding: " + OptimizeService.progress() + "%";
+        final File done = new File(getFilesDir(), "game/optimised.txt");
+        if (done.isFile()) {
+            try (BufferedReader r = new BufferedReader(new FileReader(done))) {
+                return "\n\nBuilt with " + r.readLine();
+            } catch (IOException ignored) {
+                // (fall through)
+            }
+        }
+        return module().isFile() ? "\n\nBuilt with the quick compiler (TinyCC)." : "";
     }
 
     /** When the resume state was written ("MM-DD HH:MM", from resume.txt). */
@@ -293,39 +315,82 @@ public final class LauncherActivity extends Activity {
         }).start();
     }
 
-    /** Shell APK: builds files/game/libph_game.so from the ROM on the phone (GameBuilder), with a progress dialog. */
+    /**
+     * Shell APK: builds files/game/libph_game.so from the ROM on the phone, with a progress bar. With the phone clang in
+     * the APK (GameOptimizer.available), OptimizeService builds it with clang (a notification shows the progress too,
+     * and the build carries on outside the app; TinyCC is its fallback); else TinyCC here (GameBuilder).
+     */
     private void buildGame(boolean afterUpdate) {
         if (building) return;
         building = true;
+        final boolean clang = GameOptimizer.available(this);
+        final LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        final int pad = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 20, getResources().getDisplayMetrics());
+        box.setPadding(pad, pad / 2, pad, 0);
+        final TextView text = new TextView(this);
+        text.setText("Recompiling your ROM…");
+        final android.widget.ProgressBar bar = new android.widget.ProgressBar(this, null,
+                android.R.attr.progressBarStyleHorizontal);
+        bar.setMax(100);
+        final TextView note = new TextView(this);
+        note.setText(clang ? "Built once on this phone with clang, for the best speed: several minutes on most "
+                + "phones. You can leave the app: the notification shows the progress." : "");
+        note.setAlpha(0.7f);
+        box.addView(text);
+        box.addView(bar);
+        box.addView(note);
         final AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(afterUpdate ? "App updated: building the game again" : "Building the game")
-                .setMessage("Recompiling your ROM…").setCancelable(false).show();
+                .setView(box).setCancelable(false).show();
         final long start = System.currentTimeMillis();
+        final boolean attach = clang && OptimizeService.running();  // (back in the app during a build: show it)
+        if (!attach) {
+            //noinspection ResultOfMethodCallIgnored
+            module().delete();
+            //noinspection ResultOfMethodCallIgnored
+            new File(getFilesDir(), "game/optimised.txt").delete();
+        }
+        if (clang && !attach) {
+            if (Build.VERSION.SDK_INT >= 33) requestPermissions(new String[] {"android.permission.POST_NOTIFICATIONS"}, 3);
+            OptimizeService.start(this);
+        }
         final Runnable tick = new Runnable() {
             @Override
             public void run() {
                 if (!dialog.isShowing()) return;
-                final int p = GameBuilder.progress();
-                dialog.setMessage((p < 20 ? "Recompiling your ROM…" : "Compiling the game…") + " " + p + "%");
+                if (clang && !OptimizeService.running()) {
+                    finishBuild(dialog, OptimizeService.result == null || OptimizeService.result.isEmpty() ? null
+                            : OptimizeService.result, OptimizeService.millis);
+                    return;
+                }
+                final int p = clang ? OptimizeService.progress() : GameBuilder.progress();
+                final long secs = (System.currentTimeMillis() - start) / 1000;
+                text.setText((clang ? OptimizeService.stage : p < 20 ? "Recompiling your ROM…" : "Compiling the game…")
+                        + " " + p + "%   (" + secs / 60 + ":" + String.format(Locale.US, "%02d", secs % 60) + ")");
+                bar.setProgress(p);
                 getWindow().getDecorView().postDelayed(this, 300);
             }
         };
+        tick.run();
+        if (clang) return;
         new Thread(() -> {
-            //noinspection ResultOfMethodCallIgnored
-            module().delete();
-            runOnUiThread(tick);
-            final String error = GameBuilder.run(this, rom(), module());
-            if (error == null) stampModule();
-            final long secs = (System.currentTimeMillis() - start) / 1000;
-            runOnUiThread(() -> {
-                building = false;
-                dialog.dismiss();
-                refresh();
-                new AlertDialog.Builder(this).setMessage(error == null
-                                ? "The game is ready (built in " + secs + " s). Press Start game." : error)
-                        .setPositiveButton("OK", null).show();
-            });
+            final String error = GameBuilder.run(this, rom(), module(), true);
+            if (error == null) GameBuilder.stamp(this);
+            final long ms = System.currentTimeMillis() - start;
+            android.util.Log.i("PHOpt", "TinyCC build " + (error == null ? "done" : "failed") + " in " + ms + " ms");
+            runOnUiThread(() -> finishBuild(dialog, error, ms));
         }).start();
+    }
+
+    private void finishBuild(AlertDialog dialog, String error, long ms) {
+        building = false;
+        dialog.dismiss();
+        refresh();
+        new AlertDialog.Builder(this).setMessage(error == null
+                        ? "The game is ready (built in " + (ms / 1000) + " s). Press Start game."
+                        : error.startsWith("Built") ? error + "\n\nThe game is ready. Press Start game." : error)
+                .setPositiveButton("OK", null).show();
     }
 
     /** A shell APK's game: an arm64 ELF shared library. Which ROM it was built from is checked when the game starts. */

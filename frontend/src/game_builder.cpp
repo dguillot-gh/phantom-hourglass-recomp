@@ -1,6 +1,7 @@
 #include "game_builder.hpp"
 
 #include <filesystem>
+#include <fstream>
 #include <vector>
 
 #include "libtcc.h"
@@ -36,7 +37,7 @@ std::string u8(const fs::path& p) {
 }  // namespace
 
 std::string build_game(const std::string& rom_path, const std::string& assets, const std::string& out_module,
-                       const std::string& work, std::atomic<int>& progress) {
+                       const std::string& work, std::atomic<int>& progress, const std::string& keep_c, bool compile) {
     progress = 0;
     std::error_code ec;
     const fs::path gen = fs::u8path(work) / "gen", obj = fs::u8path(work) / "obj";
@@ -59,11 +60,29 @@ std::string build_game(const std::string& rom_path, const std::string& assets, c
         recomp::load_regions(program, config);
         program.config = recomp::load_config(program, config);
         recomp::Analysis analysis = recomp::analyze(program);
-        recomp::emit_c(program, analysis, u8(gen));
+        // The hot functions (config/hot.txt, C names, one per line: from a profile of the game) in files of their own,
+        // for the optimised rebuild of just them (GameOptimizer.java / pc_optimizer.cpp).
+        recomp::EmitOptions options;
+        if (std::ifstream hot(fs::u8path(config) / "hot.txt"); hot)
+            for (std::string line; std::getline(hot, line);) {
+                while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
+                if (!line.empty() && line[0] != '#') options.hot.insert(line);
+            }
+        recomp::emit_c(program, analysis, u8(gen), options);
     } catch (const std::exception& e) {
         return std::string("Recompiling failed: ") + e.what();
     }
     progress = 20;
+    if (!compile) {  // (clang compiles it: hand the C over)
+        const fs::path keep = fs::u8path(keep_c);
+        fs::remove_all(keep, ec);
+        fs::create_directories(keep.parent_path(), ec);
+        fs::rename(gen, keep, ec);
+        if (ec) return "Cannot keep the C for the compiler: " + ec.message();
+        fs::remove_all(fs::u8path(work), ec);
+        progress = 100;
+        return "";
+    }
 
     // ---- 2. compile each C file to an object (one TinyCC state each), then link the module ----
     std::vector<fs::path> sources;
@@ -112,6 +131,14 @@ std::string build_game(const std::string& rom_path, const std::string& assets, c
     fs::remove(fs::u8path(out_module), ec);
     fs::rename(fs::u8path(tmp), fs::u8path(out_module), ec);
     if (ec) return "Cannot store the game: " + ec.message();
+    if (!keep_c.empty()) {  // (the C for the optimised rebuild, and TinyCC's objects beside it: <keep_c>/../tcc-obj)
+        const fs::path keep = fs::u8path(keep_c);
+        fs::remove_all(keep, ec);
+        fs::remove_all(keep.parent_path() / "tcc-obj", ec);
+        fs::create_directories(keep.parent_path(), ec);
+        fs::rename(gen, keep, ec);
+        fs::rename(obj, keep.parent_path() / "tcc-obj", ec);
+    }
     fs::remove_all(fs::u8path(work), ec);
     progress = 100;
     return "";
