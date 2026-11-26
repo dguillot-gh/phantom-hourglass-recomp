@@ -41,9 +41,25 @@
   | Moto G Stylus 2025 | 2.4 s | 380 s | 0.3 s | **383 s** (6 min 23 s) | 42 MB |
   | Pixel 8 | 1.6 s | 362 s | 0.4 s | **365 s** (6 min 5 s) | 42 MB |
 
-  The game started from the clang module on both. TinyCC builds the game in about 10 s (Spirit Tracks: 10.3 s on
-  the Moto G). No fps A/B for Phantom Hourglass yet; Spirit Tracks measured the same steady-state fps with both
-  compilers (within ~3%), only the first run of a series was slower with TinyCC.
+  The game started from the clang module on both. When clang fails, the app builds with TinyCC instead (checked by
+  stopping clang mid-build): 9.8 s on the Moto G, 6.9 s on the Pixel 8, recompile included.
+
+  **fps, clang vs TinyCC** (2026-11-25, test build `fastcc-2`, the same C compiled by both, default renderer Compute
+  2x, widescreen off): the game continued from two save spots, run unpaced (as fast as it goes) for 600 frames,
+  3 runs per module per spot, TinyCC and clang alternating; battery 36-37 C. Mean of the warm runs:
+
+  | Phone | Spot | TinyCC fps | clang fps | Runs (TinyCC / clang) |
+  |---|---|---:|---:|---|
+  | Moto G Stylus 2025 | resume | 99.4 | 101.5 | 101.4, 97.4 / 101.5, 101.4, 101.6 |
+  | Moto G Stylus 2025 | slot 1 | 91.2 | 91.1 | 90.3, 91.5, 91.9 / 91.4, 90.8, 91.1 |
+  | Pixel 8 | resume | 222 | 207 | 232.0, 211.6 / 224.8, 239.7, 156.7 |
+  | Pixel 8 | slot 1 | 148 | 137 | 110.6, 201.7, 130.6 / 112.0, 170.1, 127.4 |
+
+  The first run of the series (TinyCC, resume) was slow on both phones and is left out (Moto 75.0, Pixel 128.1 fps):
+  the phone warming up, not the compiler. On the Moto, clang and TinyCC run the game at the same speed (within 2%);
+  the Pixel 8 varies too much from run to run (±30%) to tell them apart. Both phones hold the DS's 60 fps with room to
+  spare with either compiler. Same result as Spirit Tracks: the clang build gives no measurable fps gain in these
+  scenes, so the emulated hardware (melonDS's ARM7 and the renderer), not the game's own code, sets the pace here.
 - **Known issue:** in **Software** mode the bottom of the screen flickers on both phones (seen 2026-11-03 during the
   measurements above); OpenGL and Compute are not affected. Not yet investigated.
 - **OpenGL on phones** (2026-11-03): OpenGL is a menu choice next to Software and Compute. Fixed on the way:
