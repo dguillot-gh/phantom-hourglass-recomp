@@ -18,7 +18,8 @@
 //   PhantomHourglass.exe <rom.nds> [--save-file F] [--data-dir D] [--input-script S] [--exit-after-frames N]
 //                        [--fullscreen] [--unpaced] [--module M] [--read-only-save] [--renderer software|gpu|compute]
 //                        [--scale 2|4|6|8] [--continue] [--wide] [--wide21] [--textures pixels|smooth|sharp]
-//                        [--fixes 0-3] [--language auto|en|fr|de|it|es] [--hd-text]
+//                        [--fixes 0-3] [--language auto|en|fr|de|it|es] [--hd-text] [--setup] [--no-launcher]
+// PC release builds (PH_PC_SETUP) open the launcher first (pc_launcher.cpp), unless a test, --continue or --no-launcher.
 #include <SDL3/SDL.h>
 #ifdef __ANDROID__
 #include <SDL3/SDL_main.h>  // (SDL's Android activity calls SDL_main in libmain.so)
@@ -71,6 +72,7 @@
 
 #include "embedded_toolchain.hpp"
 #include "game_builder.hpp"
+#include "pc_launcher.hpp"
 #ifdef _WIN32
 namespace ph { std::string win_pick_rom(std::string& error); std::string win_exe_path(); }  // win_pick.cpp
 #endif
@@ -1235,6 +1237,119 @@ bool first_run_setup(const fs::path& data_dir, fs::path& rom_path, const fs::pat
     std::fprintf(stderr, "setup: game built in %.1f s\n", double(SDL_GetTicks() - start) / 1000.0);
     return true;
 }
+
+// ---- the launcher (PC): Continue / Start game, Change ROM, Rebuild game, Open data folder and the main settings ----
+
+// Whether `path` is a Phantom Hourglass dump this program can build; else `why` says what it is.
+bool supported_rom(const fs::path& path, std::string& why) {
+    const std::vector<uint8_t> rom = read_file(path);
+    if (rom.empty()) return why = "Cannot read " + path.string(), false;
+    const ntr::KnownRom* known = ntr::find_known_rom(ntr::sha1(rom));
+    if (known && known->supported && ph::select_release(known->game_code)) return true;
+    why = path.string() + " is not a supported Phantom Hourglass dump (USA or Europe, clean or patched).\nSHA-1 " +
+          ntr::to_hex(ntr::sha1(rom));
+    return false;
+}
+
+std::string mib(uintmax_t bytes) { return std::to_string((bytes + (1u << 19)) >> 20) + " MB"; }
+
+// 0: quit, 1: start the game, 2: continue from the resume state. `rom_path` becomes the ROM the game was built from
+// when the player builds again here; game/ph_game.id is written after each build (removed when one fails, so the
+// next start builds again). Saves, save states and settings stay.
+int run_launcher(const fs::path& data_dir, fs::path& rom_path, const fs::path& module, const fs::path& id_path,
+                 const std::string& exe_id) {
+    const fs::path settings_path = data_dir / "settings.ini";
+    Settings s = load_settings(settings_path);
+    ph::launcher::Window win(kTitle);
+    if (!win.ok()) return 1;  // (no window for it: straight into the game, as before)
+    const auto build = [&](fs::path rom) {
+        std::error_code ec;
+        win.hide();
+        if (first_run_setup(data_dir, rom, module)) {
+            rom_path = rom;
+            if (!exe_id.empty()) std::ofstream(id_path) << exe_id << '\n';
+        } else {
+            fs::remove(id_path, ec);
+        }
+        win.show();
+    };
+    for (;;) {
+        std::error_code ec;
+        ph::launcher::View v;
+        v.title = "Phantom Hourglass";
+        const fs::path rom = rom_path.empty() ? kept_rom(data_dir) : rom_path;
+        const std::string name = rom.filename().string();
+        if (rom.empty()) v.info = "ROM: none - choose one with Change ROM";
+        else
+            v.info = "ROM: " + name + (name == "azep.nds" ? " (Europe), " : name == "azee.nds" ? " (USA), " : ", ") +
+                     mib(fs::file_size(rom, ec));
+        std::string built_id;
+        if (std::ifstream f(id_path); f) std::getline(f, built_id);
+        v.can_play = fs::exists(module, ec) && (exe_id.empty() || built_id == exe_id);
+        v.status = v.can_play ? "Game: built, " + mib(fs::file_size(module, ec)) : "Game: not built yet for this version";
+        v.resume_time = resume_time(data_dir / "states");
+        const bool gl = s.gpu && !s.compute;  // (texture filtering: the OpenGL renderer only)
+        int res = 1;
+        for (int i = 0; i < 4; i++)
+            if (kScales[i] == s.scale) res = i;
+        v.options = {
+            {"Screen", {"Touch", "Top", "Both"}, int(s.layout), {true, true, true}},
+            {"Renderer", {"Software", "GPU", "Compute"}, !s.gpu ? 0 : s.compute ? 2 : 1, {true, true, true}},
+            {"Resolution", {"2x", "4x", "6x", "8x"}, res, {s.gpu, s.gpu, s.gpu, s.gpu}},
+            {"3D textures", {"Pixels", "Smooth", "Sharp"}, gl ? s.textures : 0, {true, gl, gl}},
+            {"Widescreen", {"4:3", "16:9", "21:9"}, s.gpu && s.wide ? s.wide_mode : 0, {true, s.gpu, s.gpu}},
+            {"Fullscreen", {"Off", "On"}, s.fullscreen ? 1 : 0, {true, true}},
+            {"HD text", {"Off", "On"}, s.hd_text ? 1 : 0, {true, true}},
+        };
+        switch (win.run(v)) {
+            case ph::launcher::Action::Quit: return 0;
+            case ph::launcher::Action::Play: return 1;
+            case ph::launcher::Action::Continue: return 2;
+            case ph::launcher::Action::Rebuild: {
+                const fs::path from = kept_rom(data_dir);
+                build(from.empty() ? rom_path : from);  // (none at all: the setup asks for one)
+                break;
+            }
+            case ph::launcher::Action::ChangeRom: {
+                const fs::path picked = pick_rom_file();
+                std::string why;
+                if (picked.empty()) break;
+                if (!supported_rom(picked, why)) {
+                    error_box(why);
+                    break;
+                }
+                build(picked);
+                break;
+            }
+            case ph::launcher::Action::OpenFolder: {
+                fs::create_directories(data_dir, ec);
+                const auto u8 = fs::absolute(data_dir, ec).generic_u8string();
+                const std::string url = "file:///" + std::string(u8.begin(), u8.end());
+                if (!SDL_OpenURL(url.c_str())) error_box("Cannot open " + url + ": " + SDL_GetError());
+                break;
+            }
+            case ph::launcher::Action::Changed: {
+                const int c = v.options[size_t(win.changed_option)].chosen;
+                switch (win.changed_option) {
+                    case 0: s.layout = Layout(c); break;
+                    case 1: s.gpu = c >= 1, s.compute = c == 2; break;
+                    case 2: s.scale = kScales[c]; break;
+                    case 3: s.textures = c; break;
+                    case 4:
+                        s.wide = c != 0;
+                        if (c) s.wide_mode = c;
+                        break;
+                    case 5: s.fullscreen = c == 1; break;
+                    case 6: s.hd_text = c == 1; break;
+                    default: break;
+                }
+                save_settings(settings_path, s);
+                break;
+            }
+            default: break;
+        }
+    }
+}
 #endif
 
 }  // namespace
@@ -1244,7 +1359,7 @@ int main(int argc, char** argv) {
     fs::path rom_path, save_path, data_dir, script_path, module_path = ph::default_module_path();
     uint64_t exit_after = 0;
     bool fullscreen_arg = false, unpaced = false, read_only_save = false, continue_arg = false, wide_arg = false, wide21_arg = false;
-    bool fps_probe_arg = false, hd_text_arg = false, setup_arg = false;
+    bool fps_probe_arg = false, hd_text_arg = false, setup_arg = false, no_launcher_arg = false;
     std::string renderer_arg, textures_arg;
     int scale_arg = 0, fixes_arg = -1, language_arg = -2;
     for (int i = 1; i < argc; i++) {
@@ -1274,7 +1389,8 @@ int main(int argc, char** argv) {
             }
         }
         else if (a == "--hd-text") hd_text_arg = true;
-        else if (a == "--setup") setup_arg = true;  // (PC: build the game again from the kept ROM, or a new one)
+        else if (a == "--setup") setup_arg = true;
+        else if (a == "--no-launcher") no_launcher_arg = true;  // (PC: build the game again from the kept ROM, or a new one)
         else if (a == "--no-settings") {}  // (accepted: tests never write settings anyway, see below)
         else if (!a.empty() && a[0] != '-' && rom_path.empty()) rom_path = a;
         else {
@@ -1333,6 +1449,12 @@ int main(int argc, char** argv) {
                 rom_path = fs::exists(base / "rom" / "azee.nds", ec) ? base / "rom" / "azee.nds" : base / "rom" / "azep.nds";
             if (!first_run_setup(data_dir, rom_path, module_path)) return 0;
             if (!exe_id.empty()) std::ofstream(id_path) << exe_id << '\n';
+        }
+        // The launcher (Change ROM, Rebuild game, settings) before the game; scripted tests and --continue skip it.
+        if (!testing && !continue_arg && !no_launcher_arg) {
+            const int chosen = run_launcher(data_dir, rom_path, module_path, id_path, exe_id);
+            if (chosen == 0) return 0;
+            continue_arg = chosen == 2;
         }
     }
 #endif
