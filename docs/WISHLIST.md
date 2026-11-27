@@ -62,6 +62,15 @@ status or caution note; nothing here is promised.
 - **Dual-screen layouts on PC.** A configurable side-by-side or picture-in-picture layout, like the phone's corner
   minimap, so the sea chart, rail map or a boss's weak point on the top screen is in view without switching screens.
   *Note: the PC has Bottom / Top / Both today; the corner minimap is phone-only.*
+- **More texture filters: xBRZ, HQ2x/3x/4x (work in progress).** xBR is in (the "3D textures" setting, OpenGL
+  renderer): it was the easy win, a per-pixel shader in `third_party/ffcc_smooth_tex.glsl` that works at any scale. The
+  others are still to do. xBRZ and HQnx upscale each texture by a fixed factor on the CPU when it is decoded, so they
+  need melonDS's GL texture cache to keep textures at N times their size (and N^2 the memory), the scaler on every
+  decode, and the same again for the Compute renderer's texture path. *Note: Spirit Tracks Recomp issue #25.*
+- **32:9 widescreen (super-ultrawide monitors).** Planned, next to 16:9 and 21:9. It looks like a new width (213 DS
+  pixels each side, 682 x 192) rather than new work: the camera's view planes already follow the aspect. In Spirit
+  Tracks, `st_load_mtx44` only accepts aspects up to 0x2800 and needs 0x3900 added. *Note: Phantom Hourglass Recomp
+  issue #23.*
 
 ## 4. Smaller items (from play-testing, 2026-11-24)
 
