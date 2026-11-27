@@ -68,7 +68,8 @@ public final class PhInput {
 
     public static native boolean nativeComputeFailed();
 
-    /** The 3D's textures with the GPU renderer: 0 the DS's pixels, 1 smooth, 2 sharp (crisp, soft only between texels). */
+    /** The 3D's textures with the GPU renderer: 0 the DS's pixels, 1 smooth, 2 sharp (crisp, soft only between texels),
+     *  3 xBR (the texels' edges redrawn as lines). */
     public static native void nativeSetTextures(int mode);
 
     /** Widescreen mode: 0 off, 1 16:9, 2 21:9. */

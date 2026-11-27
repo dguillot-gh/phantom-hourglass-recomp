@@ -91,7 +91,7 @@ All scripts take `-DryRun`. Run from the workspace with `powershell -NoProfile -
 | `scripts/6-INSTALL-PHONE.ps1` | installs the APK, pushes the ROM into the app, a save only if the phone has none |
 
 PC program options (`PhantomHourglass.exe <rom> ...`): `--renderer software|gpu|compute`, `--scale 2|4|6|8`,
-`--wide`, `--textures pixels|smooth|sharp`, `--fixes 0-3`, `--continue`, `--data-dir D`, `--save-file F`,
+`--wide`, `--textures pixels|smooth|sharp|xbr`, `--fixes 0-3`, `--continue`, `--data-dir D`, `--save-file F`,
 `--input-script S`, `--exit-after-frames N`, `--unpaced`, `--fullscreen`. PC keys: F1/Esc menu, F5/F8 save/load
 state, F9 continue, Tab/F2 screens, F3 smooth, F4 FPS, F11 fullscreen, F12 screenshot, \` fast-forward, M mic, C lid.
 

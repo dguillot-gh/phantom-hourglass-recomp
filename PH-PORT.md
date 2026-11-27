@@ -89,7 +89,7 @@ shares the config with the clean dump (sha1 4c8f52dd...). melonDS's ROM list giv
     full-width bottom menu bar goes left with the Menu button, and a sprite moved last frame that is still in the same
     place with the same tile and palette keeps its move (the Menu button merges with the dialogue box's sprites, too
     big to move). Up to 32 moved boxes per frame for the touch mapping.
-  - 3D texture filtering in both menus (Pixels / Smooth / Sharp, GPU renderer: VideoSettings::texture_smoothing,
+  - 3D texture filtering in both menus (Pixels / Smooth / Sharp / xBR, GPU renderer: VideoSettings::texture_smoothing,
     the engine's FfccSmoothTex shader patch); --textures. The PC menu puts labels beside the chips when the window is
     too short for them stacked.
 

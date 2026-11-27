@@ -41,8 +41,9 @@ const char* renderer_name(Renderer r);
 
 // Filtering of the game's 3D textures (OpenGL renderer): the DS reads each texture with nearest sampling, so upscaled
 // textures show their texels as blocks. Smooth blends the four texels around a point; Sharp keeps the texels crisp and
-// blends only in a band one pixel wide between them.
-enum class TextureSmoothing { Off, Smooth, Sharp };
+// blends only in a band one pixel wide between them. Xbr redraws the texels' edges as lines (xBR level 2, the pixel-art
+// scaler of the xBRZ family, worked out per pixel at any scale: third_party/ffcc_smooth_tex.glsl).
+enum class TextureSmoothing { Off, Smooth, Sharp, Xbr };
 
 struct VideoSettings {
     Renderer renderer = Renderer::Software;
@@ -51,7 +52,7 @@ struct VideoSettings {
     bool hires_coordinates = true;   // Compute: keep sub-pixel vertex positions when upscaling
     bool stable_textures = false;    // all renderers: cut quads whose texture coordinates no perspective transform fits
                                      // into a grid, so the texture stays on the surface (the DS bends it by the view)
-    TextureSmoothing texture_smoothing = TextureSmoothing::Off;  // OpenGL: bilinear filtering of the game's textures
+    TextureSmoothing texture_smoothing = TextureSmoothing::Off;  // OpenGL: filtering of the game's textures
     bool threaded = true;            // Software: render 3D on a worker thread
     bool interpolate = false;        // 3D at 60 fps: blend the game's 30 Hz scenes (one frame of latency)
     bool display_rate = false;       // with interpolate and a GL renderer: blend for each displayed frame instead,

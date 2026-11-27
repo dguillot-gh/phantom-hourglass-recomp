@@ -67,7 +67,7 @@ Menu::Geometry Menu::geometry(const MenuState& s, float win_w, float win_h, floa
         r[kResolution] = {"Resolution", {"1x", "2x", "4x", "6x", "8x"}, chosen, {!s.gpu, s.gpu, s.gpu, s.gpu, s.gpu}, {}, {}};
     }
     const bool gl = s.gpu && !s.compute;  // texture filtering is only implemented by the classic OpenGL renderer
-    r[kTextures] = {"3D textures (GPU)", {"Pixels", "Smooth", "Sharp"}, gl ? s.textures : 0, {true, gl, gl}, {}, {}};
+    r[kTextures] = {"3D textures (GPU)", {"Pixels", "Smooth", "Sharp", "xBR"}, gl ? s.textures : 0, {true, gl, gl, gl}, {}, {}};
     // (Seams: the GPU renderer's better polygons. Warp: textures the DS bends with the view, cut into a grid.)
     r[kFixes] = {"3D fixes", {"Off", "Seams", "Warp", "Both"}, s.gpu ? s.fixes : s.fixes & 2, {true, s.gpu, true, s.gpu}, {}, {}};
     r[kPicture] = {"Picture", {"Sharp", "Smooth"}, s.smooth ? 1 : 0, {true, true}, {}, {}};

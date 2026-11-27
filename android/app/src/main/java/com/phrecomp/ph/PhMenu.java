@@ -193,13 +193,14 @@ final class PhMenu {
         }, new boolean[] {software, hardware, hardware});
         if (opengl) {
             list.addView(label("3D textures", (computeFailed ? "Compute is unavailable, so the standard GPU renderer is active. "
-                    : "") + "Pixels keeps the DS's blocky texels; Smooth blends them; Sharp keeps them crisp with soft edges between."));
-            final int textures = Math.max(0, Math.min(2, prefs.getInt("textures", 0)));
-            chips(list, new String[] {"Pixels", "Smooth", "Sharp"}, textures, i -> {
+                    : "") + "Pixels keeps the DS's blocky texels; Smooth blends them; Sharp keeps them crisp with soft edges between; xBR redraws their edges as smooth lines, "
+                    + "like an emulator's xBRZ (more work for the GPU)."));
+            final int textures = Math.max(0, Math.min(3, prefs.getInt("textures", 0)));
+            chips(list, new String[] {"Pixels", "Smooth", "Sharp", "xBR"}, textures, i -> {
                 prefs.edit().putInt("textures", i).apply();
                 PhInput.nativeSetTextures(i);
                 refresh();
-            }, new boolean[] {true, true, true});
+            }, new boolean[] {true, true, true, true});
         }
 
         states(list);
