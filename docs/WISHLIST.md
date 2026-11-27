@@ -82,6 +82,14 @@ status or caution note; nothing here is promised.
 
 ## 5. Developer and community tooling
 
+- **Bug reports from the app.** A "Report a bug" button (PC menu, phone launcher and ≡ menu) that gathers what a
+  report needs: the app version and commit, the ROM's release (code and SHA-1, not the ROM), the device, GPU and driver,
+  the settings, the game build's own logs (`opt-build.log`, `link.log`, the on-device build's output), and the last few
+  hundred lines of the program's log. On a phone it goes out through the share sheet (email, Discord, Drive); on a PC
+  it is saved as one text file in the data folder and the GitHub "new issue" page opens with the summary filled in.
+  *Note: a log file comes first. Today the PC exe's output goes nowhere (a GUI program) and the phone's goes to
+  logcat only (`android_bridge.cpp`'s LogcatPipe), so both would also write a small rotating log in the data folder.
+  Sending reports straight to a server would need a service to receive them; the share sheet and GitHub need none.*
 - **CI on every push (GitHub Actions).** Build the Windows, Linux and Android programs and run the tests on every push,
   so a platform-specific break shows at once, in both repositories. *Note: without a ROM there is no game code to
   compile (the recompiler makes it from the player's ROM); CI can build the program, the runtime, the recompiler and
