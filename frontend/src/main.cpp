@@ -1253,6 +1253,11 @@ bool supported_rom(const fs::path& path, std::string& why) {
 
 std::string mib(uintmax_t bytes) { return std::to_string((bytes + (1u << 19)) >> 20) + " MB"; }
 
+std::string u8_string(const fs::path& p) {
+    const auto s = p.u8string();
+    return std::string(s.begin(), s.end());
+}
+
 // 0: quit, 1: start the game, 2: continue from the resume state. `rom_path` becomes the ROM the game was built from
 // when the player builds again here; game/ph_game.id is written after each build (removed when one fails, so the
 // next start builds again). Saves, save states and settings stay.
@@ -1260,7 +1265,7 @@ int run_launcher(const fs::path& data_dir, fs::path& rom_path, const fs::path& m
                  const std::string& exe_id) {
     const fs::path settings_path = data_dir / "settings.ini";
     Settings s = load_settings(settings_path);
-    ph::launcher::Window win(kTitle);
+    ph::launcher::Window win(kTitle, ph::kHdFontData, ph::kHdFontSize);
     if (!win.ok()) return 1;  // (no window for it: straight into the game, as before)
     const auto build = [&](fs::path rom) {
         std::error_code ec;
@@ -1276,17 +1281,26 @@ int run_launcher(const fs::path& data_dir, fs::path& rom_path, const fs::path& m
     for (;;) {
         std::error_code ec;
         ph::launcher::View v;
+        v.app_name = "Phantom Hourglass Recomp";
+        v.short_name = "PH";
+        v.series = "THE LEGEND OF ZELDA";
         v.title = "Phantom Hourglass";
+#ifdef PH_BUILD_LABEL
+        v.version = PH_BUILD_LABEL;
+#endif
+        v.art = 0;  // (the sea)
+        v.accent = 0xF5A524;
         const fs::path rom = rom_path.empty() ? kept_rom(data_dir) : rom_path;
-        const std::string name = rom.filename().string();
-        if (rom.empty()) v.info = "ROM: none - choose one with Change ROM";
-        else
-            v.info = "ROM: " + name + (name == "azep.nds" ? " (Europe), " : name == "azee.nds" ? " (USA), " : ", ") +
-                     mib(fs::file_size(rom, ec));
+        const std::string name = u8_string(rom.filename());
+        if (!rom.empty())
+            v.rom_line = name + (name == "azep.nds" ? " (Europe), " : name == "azee.nds" ? " (USA), " : ", ") +
+                         mib(fs::file_size(rom, ec));
         std::string built_id;
         if (std::ifstream f(id_path); f) std::getline(f, built_id);
         v.can_play = fs::exists(module, ec) && (exe_id.empty() || built_id == exe_id);
-        v.status = v.can_play ? "Game: built, " + mib(fs::file_size(module, ec)) : "Game: not built yet for this version";
+        v.game_line = v.can_play ? "Built for this version, " + mib(fs::file_size(module, ec))
+                                 : "Not built for this version yet: Rebuild game";
+        v.data_dir = u8_string(data_dir);
         v.resume_time = resume_time(data_dir / "states");
         const bool gl = s.gpu && !s.compute;  // (texture filtering: the OpenGL renderer only)
         int res = 1;
