@@ -53,6 +53,31 @@ from the table below).
 gamepad's stick (on Android it turns the on-screen D-pad into a stick). With the USA or Europe **D-pad patch** dump, the D-pad works. D-pad movement
 on clean dumps is in progress (Spirit Tracks Recomp already has it).
 
+## The launcher, changing the ROM, starting over (Windows)
+
+After the first build, `PhantomHourglass.exe` opens a launcher before the game. The game page has **CONTINUE** (where you last quit) or
+**PLAY**, and **Start game** (from the title screen). The cog opens Settings, which has two tabs. **Display** holds the
+main settings: screen, renderer, resolution, 3D textures, widescreen, fullscreen and HD text. The in-game menu (F1 or
+Esc) has the rest. **Game files** has **Change ROM...** (pick another dump: the game is built again from it, saves
+kept), **Rebuild game** (from the kept ROM) and **Open folder** (the data folder). The X quits. Mouse, keyboard
+(arrows, Enter, Esc) and gamepad (D-pad, A, B, shoulder buttons) all work. `--no-launcher` starts the game straight away; `--setup` builds again from the command line.
+
+Everything lives in the data folder (the launcher's Settings, **Game files**, **Open folder** opens it):
+
+- `%APPDATA%\PH-Recomp\PhantomHourglass` (paste it into Explorer's address bar), or
+- `data\` next to the exe when a file named `portable.txt` is next to it (a portable copy, e.g. on a USB stick).
+
+| Folder / file | What it is | Starting over |
+|---|---|---|
+| `game\` | the game built from your ROM (`ph_game.dll`, `ph_game.id`) | delete: it is built again at the next start |
+| `rom\` | the copy of your ROM it was built from (`azee.nds` or `azep.nds`) | delete to be asked for a ROM again |
+| `saves\` | your in-game save (`azee.sav` / `azep.sav`) | **keep** |
+| `states\` | save states and the Continue state | keep (delete only to drop them) |
+| `settings.ini` | settings | delete to go back to the defaults |
+
+To start over with a different ROM by hand: close the game, delete `game\` and `rom\`, start `PhantomHourglass.exe` and select
+the new dump. Your saves stay.
+
 ## What you need
 
 - Your own dump. Supported (checked by SHA-1):
