@@ -4,6 +4,10 @@ A native port of **The Legend of Zelda: Phantom Hourglass** (Nintendo DS) to Win
 ARM9 code is statically recompiled to C and compiled ahead of time instead of emulated; the rest of the DS comes from
 [melonDS](https://github.com/melonDS-emu/melonDS).
 
+https://discord.gg/P3nqgTarW - discord link here
+
+For anyone who wants to join. 
+
 > **No game data is included.** The game is built from your own dump, on your own PC or phone. The downloads
 > (`PhantomHourglass.exe`, `PhantomHourglass.apk`) contain only the program. If you build it yourself (below), please
 > don't share what you make: that game folder and APK contain the game.
